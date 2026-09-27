@@ -28,31 +28,42 @@ final class CssPalette {
     record Pick(String color, int priority) {}
 
     static StyleService.Suggestion extract(String css, List<String> sourceNotes) {
+        return extractSamples(List.of(css), sourceNotes);
+    }
+
+    static StyleService.Suggestion extractSamples(List<String> cssSamples, List<String> sourceNotes) {
         // ponytail: literal tokens only; use a full CSS parser if computed styles become a requirement.
         var declarations = new ArrayList<Declaration>();
-        var blocks = BLOCK.matcher(withoutComments(css));
-        while (blocks.find()) {
-            var values = DECLARATION.matcher(blocks.group(2));
-            while (values.find()) declarations.add(new Declaration(blocks.group(1).trim().toLowerCase(Locale.ROOT),
-                values.group(1).toLowerCase(Locale.ROOT), values.group(2).trim()));
+        for (String css : cssSamples) {
+            // A truncated comment or rule in one sample must not swallow the next stylesheet.
+            var blocks = BLOCK.matcher(withoutComments(css));
+            while (blocks.find()) {
+                var values = DECLARATION.matcher(blocks.group(2));
+                while (values.find()) declarations.add(new Declaration(blocks.group(1).trim().toLowerCase(Locale.ROOT),
+                    values.group(1).toLowerCase(Locale.ROOT), values.group(2).trim()));
+            }
         }
         var variables = new HashMap<String, String>();
         declarations.stream().filter(d -> d.name.startsWith("--")).forEach(d -> variables.put(d.name, d.value));
         var picks = new HashMap<String, Pick>();
         String font = "sans";
         boolean foundFont = false;
+        int fontPriority = -1;
         for (var d : declarations) {
             String value = resolve(d.value, variables);
-            if (d.name.equals("font-family") || d.name.contains("font-family") || d.name.equals("--font-body")) {
+            boolean body = d.selector.equals("body") || d.selector.equals("html") || d.selector.equals(":root") || d.selector.equals("html, body");
+            int priority = body && !d.name.startsWith("--") ? 100 : d.name.matches(".*(?:body|base|default)$") ? 90 : 20;
+            if (!d.selector.startsWith("@font-face") && priority >= fontPriority
+                && (d.name.equals("font-family") || d.name.contains("font-family") || d.name.equals("--font-body"))) {
                 String lower = value.toLowerCase(Locale.ROOT);
                 if (lower.contains("mono") || lower.contains("courier") || lower.contains("consolas")) font = "mono";
                 else if (lower.contains("georgia") || lower.contains("times") || lower.contains("palatino") || lower.matches(".*(?:^|[, ])serif(?:[, ;]|$).*")) font = "serif";
                 else font = "sans";
                 foundFont = true;
+                fontPriority = priority;
             }
             String color = color(value);
             if (color == null) continue;
-            boolean body = d.selector.equals("body") || d.selector.equals("html") || d.selector.equals(":root") || d.selector.equals("html, body");
             String name = d.name;
             if (name.startsWith("--")) {
                 if (name.matches(".*(?:accent|primary|brand|link)(?:-color)?$")) choose(picks, "accent", color, 90);
@@ -70,10 +81,10 @@ final class CssPalette {
         }
         if (picks.isEmpty() && !foundFont) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
             "No usable color or font declarations found. Try a stylesheet with literal hex or RGB colors.");
-        String background = get(picks, "background", "#f7f4ed");
+        String background = get(picks, "background", get(picks, "surface", "#faf8ff"));
         String surface = get(picks, "surface", luminance(background) < .25 ? "#24282b" : "#ffffff");
-        String text = get(picks, "text", "#202522");
-        String accent = get(picks, "accent", "#b84a22");
+        String text = get(picks, "text", "#131b2e");
+        String accent = get(picks, "accent", "#0053db");
         var notes = new ArrayList<>(sourceNotes);
         if (contrast(text, background) < 4.5 || contrast(text, surface) < 4.5) {
             String onLight = "#171b19", onDark = "#ffffff";

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-// Embedify-only TrueNAS helper. It can inspect or create this app; it cannot
-// replace, delete, or target any other app. One scoped update connects it to NPM.
+// Embedify-only TrueNAS helper. Scoped updates change its image or connect it to
+// NPM; it cannot delete the app or target any other app.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -229,9 +229,9 @@ function connectProxyNetwork(config) {
 
 async function main() {
   const mode = process.argv[2];
-  assert(['inspect', 'create', 'use-proxy-network', 'proxy-network', 'self-test'].includes(mode), 'Usage: truenas.mjs inspect|create|use-proxy-network|proxy-network|self-test');
+  assert(['inspect', 'create', 'update-image', 'use-proxy-network', 'proxy-network', 'self-test'].includes(mode), 'Usage: truenas.mjs inspect|create|update-image|use-proxy-network|proxy-network|self-test');
   if (mode === 'self-test') return selfTest();
-  const config = mode === 'create' ? readCompose() : undefined;
+  const config = ['create', 'update-image'].includes(mode) ? readCompose() : undefined;
   const { rpc, close } = await connectTrueNAS();
   try {
     if (mode === 'proxy-network') {
@@ -249,15 +249,19 @@ async function main() {
       console.log(JSON.stringify(summarizeApp(rows[0]), null, 2));
       return;
     }
-    assert.equal(process.argv[3], '--confirm', 'Creating the app requires an exact confirmation.');
+    assert.equal(process.argv[3], '--confirm', 'Changing the app requires an exact confirmation.');
     assert.equal(process.argv[4], APP, 'Exact TrueNAS app confirmation required.');
-    if (mode === 'use-proxy-network') {
+    if (mode === 'use-proxy-network' || mode === 'update-image') {
       assert.equal(rows.length, 1, 'Embedify must already exist.');
       const current = await rpc('app.config', [APP]);
-      const updated = connectProxyNetwork(current);
+      const updated = mode === 'use-proxy-network' ? connectProxyNetwork(current) : validateCompose(current);
+      if (mode === 'update-image') updated.services[APP].image = config.services[APP].image;
       const jobId = await rpc('app.update', [APP, { custom_compose_config: updated }]);
       assert(Number.isInteger(jobId), 'TrueNAS did not return a valid update job id.');
       await waitJob(rpc, jobId);
+      const saved = await rpc('app.config', [APP]);
+      assert.deepEqual(saved, updated, 'Saved Embedify configuration differs from the requested scoped update.');
+      console.log('Saved configuration verified; only the requested scoped change was applied.');
       console.log(JSON.stringify(summarizeApp((await appRows(rpc))[0]), null, 2));
       return;
     }

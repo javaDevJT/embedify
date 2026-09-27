@@ -959,15 +959,19 @@
         redirect: "error",
         referrerPolicy: "no-referrer"
       });
-      if (!response.ok) throw new Error("style suggestion unavailable");
-      const result = validStyleResponse(await response.json());
-      if (!result) throw new Error("style suggestion invalid");
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const detail = payload && typeof payload.message === "string" ? cleanText(payload.message, 180) : "Couldn’t read this page. Try a stylesheet URL or paste CSS instead.";
+        throw new Error(detail);
+      }
+      const result = validStyleResponse(payload);
+      if (!result) throw new Error("No usable palette was returned. Try a stylesheet URL or paste CSS instead.");
       state.pendingStyle = result;
       showStyleSuggestion(result);
       setMessage(status, "Suggestion ready. Review it, then choose whether to apply it.");
       suggestion.hidden = false;
-    } catch (_) {
-      setMessage(status, "Couldn’t suggest a palette. Check the source and try again.", "error");
+    } catch (error) {
+      setMessage(status, error.message || "Couldn’t read this page. Try a stylesheet URL or paste CSS instead.", "error");
     } finally {
       button.disabled = false;
     }

@@ -39,12 +39,12 @@ The helper uses Bun, the existing macOS Keychain credential `codex-truenas-mcp`,
 - `bun scripts/truenas.mjs create --confirm embedify` creates only this app from the reviewed Compose configuration. It refuses an existing app or occupied port.
 - `bun scripts/truenas.mjs use-proxy-network --confirm embedify` is the narrowly scoped migration used for the initial deployment. It preserves the existing app configuration and image while connecting only Embedify to NPM's network. It is not a general update or removal command.
 
-For a later image release, use TrueNAS's existing-app configuration to replace only the image digest while preserving the proxy network, environment, port, and container restrictions. Recheck the running digest, health, served assets, and public iframe flow after any update. Revalidate the pinned control-plane certificate if TrueNAS renews it.
+For a later image release, update the ignored `.env` to the successful CI image digest, then run `bun scripts/truenas.mjs update-image --confirm embedify`. This validates the existing app and replaces only its image, preserving the proxy network, environment, port, and container restrictions. Recheck the running digest, health, served assets, and public iframe flow after the update. Revalidate the pinned control-plane certificate if TrueNAS renews it.
 
 ## Cache and operating limits
 
 Feed pulls share a bounded 60-second cache and coalesce concurrent misses. Parsed results share a separate bounded 8 MiB cache with no extra freshness TTL; two uncached parses can run concurrently. Per-client request quotas, global outbound concurrency, response-size limits, and recurrence bounds limit abuse. Both caches are in memory; no calendar database exists.
 
-Style suggestions extract literal CSS colors and a local font category. They do not execute CSS or page scripts. File uploads, credentials, private-network URLs, and non-HTTPS feed requests are rejected. Public embeds expose their feed URLs, so never use secret calendar links.
+Style suggestions sample up to 1 MiB from a public page and up to three linked public CSS files (64 KiB each), including CDN stylesheets. Inline CSS samples and pasted CSS are bounded. Fetches retain public-address checks and time limits; scripts, CSS imports, and fonts are not fetched. Suggestions extract literal colors and a local font category without executing CSS. File uploads, credentials, private-network URLs, and non-HTTPS feed requests are rejected. Public embeds expose their feed URLs, so never use secret calendar links.
 
 Cloudflare may reject generic automation user agents; ordinary browser access and the public user flows above were verified. This does not require weakening the app's content security policy.

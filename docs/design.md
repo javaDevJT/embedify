@@ -7,7 +7,7 @@
 - Builder and instructions at `/`; iframe calendar at `/embed`. Month and agenda views; URL parameters control colors, typography, spacing, title, timezone, and week start.
 - Feed data is fetched on demand through a shared bounded 60-second cache; concurrent misses coalesce. Requests, upstream bytes, fetch concurrency, and recurrence expansion are bounded.
 - Outbound requests must resolve to public IPs; pin validated DNS results to the connection, validate every redirect, keep TLS hostname verification, disallow credentials and non-HTTPS ports.
-- Style suggestions accept pasted CSS text or one public page/CSS URL. Extract a palette and a safe font category. Never execute supplied CSS/HTML/JavaScript, render a remote page, or fetch assets beyond bounded same-origin linked stylesheets.
+- Style suggestions accept pasted CSS text or one public page/CSS URL. Extract a palette and a safe font category. Never execute supplied CSS/HTML/JavaScript, render a remote page, or fetch assets beyond up to three bounded public stylesheets, including CDN hosts.
 - Secret feed URLs are visible to visitors and must not be used on public pages. Logs and errors must omit feed query strings; responses use no-store and no-referrer.
 - Jlink runtime and non-root container, read-only filesystem, dropped capabilities, no privilege escalation. Private GitHub repository and private build image until explicit publication approval.
 
@@ -51,7 +51,18 @@ Workers consume the HTTP contract above; backend exports `tech.javadevjt.embedif
 - Public HTTPS feeds only, confirmed by the user.
 - The user rejected the initial visual design and requested a Stitch redesign. Stitch project `396617582496486596` is private; generated screen `2aece2e815c8419190d6da888de11d33`, design system `assets/b1643b6912294fbba20c52ac46543bf6` (Precision Slate Embed). Source exports and request are retained under ignored `artifacts/stitch/`; the implemented static UI is the reviewable deliverable. Keep the generated slate/blue visual direction, adapt it to existing working features, and omit mock controls and unsupported marketing claims.
 
-## Integration evidence, September 27, 2026
+## Follow-up investigation, September 27, 2026
+
+- Primary owns reproduction and correction of public-page style matching for the Atlassian Confluence URL, including any application changes and release.
+- Ads research worker: read-only investigation of current Google AdSense publisher rules for an unobtrusive ad in a third-party calendar iframe. Deliver a sourced recommendation and constraints for the primary's design decision; no account, ad, or infrastructure changes.
+- Worker selection rechecked against the live native catalog: `gpt-6-luna` / `max`; older Luna entries are explicitly marked older. No priority selector is exposed. The worker completes/releases after its bounded handoff.
+- Fetch-prefix worker owns `SafeFetcher` and its network tests only: add a bounded HTML/CSS prefix fetch for style discovery while preserving strict complete-feed fetches, DNS pinning, redirect checks, timeout and concurrency budgets. Primary consumes the new method in style extraction. Worker uses the same verified model policy and completes/releases after its focused tests.
+
+## Initial release integration evidence, September 27, 2026
+
+The style-import follow-up reproduced the Atlassian page exceeding the old 256 KiB whole-page limit, with useful stylesheet links on separate public CDN hosts. The importer now reads a bounded 1 MiB page prefix plus up to three guarded 64 KiB stylesheets. Each CSS sample is parsed separately so truncation cannot hide the next sheet. Calendar fetches still require complete bounded responses. Optional stylesheet failures no longer discard usable page styles; capacity limits still propagate.
+
+Follow-up checks: `mvn -B -ntp verify` passed all 32 tests, UI checks and the TrueNAS helper self-test passed, and the actual Atlassian URL returned a white/slate/blue sans-serif palette locally. The network worker completed; primary reviewed cancellation-before-close and cache isolation. AdSense research is complete in [monetization.md](monetization.md); no ads or tracking were enabled. Public release evidence is recorded separately in [deployment.md](deployment.md).
 
 - `mvn -B -ntp verify`: 27 tests, zero failures/errors. `node scripts/ui-check.mjs` passed.
 - Primary browser checks exercised CalendarLabs US holidays, rendered Labor Day, CSS palette suggestion/application, public-page style extraction from `https://example.com/`, and copying the embed URL. The mobile builder had a 390 px viewport and 390 px document width; the desktop and dark calendar were inspected visually.

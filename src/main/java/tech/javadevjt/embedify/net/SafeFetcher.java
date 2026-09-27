@@ -107,21 +107,26 @@ public final class SafeFetcher {
      * coalesced and cached for 60 seconds; failures are coalesced briefly to dampen retries.
      */
     public FetchResult fetch(String rawUrl, int maxBytes) {
-        return fetch(rawUrl, maxBytes, false);
+        return fetch(rawUrl, maxBytes, false, false);
+    }
+
+    /** Fetches a bounded prefix from an allowed text resource for style extraction. */
+    public FetchResult fetchStylePrefix(String rawUrl, int maxBytes) {
+        return fetch(rawUrl, maxBytes, false, true);
     }
 
     /** Fetches a resource and requires every redirect to stay on the initial HTTPS origin. */
     public FetchResult fetchSameOrigin(String rawUrl, int maxBytes) {
-        return fetch(rawUrl, maxBytes, true);
+        return fetch(rawUrl, maxBytes, true, false);
     }
 
-    private FetchResult fetch(String rawUrl, int maxBytes, boolean sameOriginOnly) {
+    private FetchResult fetch(String rawUrl, int maxBytes, boolean sameOriginOnly, boolean prefixMode) {
         if (maxBytes < 1 || maxBytes > MAX_ALLOWED_BYTES) {
             throw new IllegalArgumentException("maxBytes must be between 1 and 1048576");
         }
         URI normalized = urlPolicy.normalize(rawUrl);
-        CacheKey key = new CacheKey(normalized.toASCIIString(), maxBytes, sameOriginOnly);
-        CachedFetch value = cache.get(key, ignored -> fetchAndCache(normalized, maxBytes, sameOriginOnly));
+        CacheKey key = new CacheKey(normalized.toASCIIString(), maxBytes, sameOriginOnly, prefixMode);
+        CachedFetch value = cache.get(key, ignored -> fetchAndCache(normalized, maxBytes, sameOriginOnly, prefixMode));
         if (value.failure != null) {
             throw value.failure;
         }
@@ -129,12 +134,12 @@ public final class SafeFetcher {
         return new FetchResult(result.body(), result.contentType(), result.url());
     }
 
-    private CachedFetch fetchAndCache(URI initialUrl, int maxBytes, boolean sameOriginOnly) {
+    private CachedFetch fetchAndCache(URI initialUrl, int maxBytes, boolean sameOriginOnly, boolean prefixMode) {
         if (!upstreamSlots.tryAcquire()) {
             return CachedFetch.failed(new SafeFetchException(SafeFetchException.Kind.BUSY));
         }
         try {
-            return CachedFetch.succeeded(remoteFetch.fetch(initialUrl, maxBytes, sameOriginOnly));
+            return CachedFetch.succeeded(remoteFetch.fetch(initialUrl, maxBytes, sameOriginOnly, prefixMode));
         } catch (SafeFetchException exception) {
             return CachedFetch.failed(exception);
         } catch (InterruptedException exception) {
@@ -147,7 +152,7 @@ public final class SafeFetcher {
         }
     }
 
-    private FetchResult fetchRedirects(URI initialUrl, int maxBytes, boolean sameOriginOnly) throws InterruptedException {
+    private FetchResult fetchRedirects(URI initialUrl, int maxBytes, boolean sameOriginOnly, boolean prefixMode) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(FETCH_DEADLINE_MILLIS);
         URI current = initialUrl;
         for (int redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
@@ -166,7 +171,7 @@ public final class SafeFetcher {
 
             remainingMillis = remainingMillis(deadline);
             if (remainingMillis <= 0) throw upstreamFailure();
-            HopResponse response = requestOnce(target, maxBytes, remainingMillis, deadline);
+            HopResponse response = requestOnce(target, maxBytes, remainingMillis, deadline, prefixMode);
             if (response.location == null) {
                 if (response.status < 200 || response.status >= 300) {
                     throw upstreamFailure();
@@ -181,7 +186,7 @@ public final class SafeFetcher {
     }
 
     private HopResponse requestOnce(PublicHttpsUrlPolicy.Target target, int maxBytes,
-                                    int remainingMillis, long deadline) throws InterruptedException {
+                                    int remainingMillis, long deadline, boolean prefixMode) throws InterruptedException {
         DnsResolver pinnedDns = new PinnedDnsResolver(target);
         HttpClientConnectionManager manager = PoolingHttpClientConnectionManagerBuilder.create()
                 .setDnsResolver(pinnedDns)
@@ -209,36 +214,39 @@ public final class SafeFetcher {
             request.setHeader("Accept-Encoding", "identity");
             request.setHeader("User-Agent", "Embedify/0.1");
             try (CloseableHttpResponse response = client.execute(request)) {
-                int status = response.getCode();
-                String location = header(response, "Location");
-                if (isRedirect(status)) {
-                    return new HopResponse(status, location, new byte[0], safeContentType(header(response, "Content-Type")));
-                }
-                if (status < 200 || status >= 300) {
-                    return new HopResponse(status, null, new byte[0], "application/octet-stream");
-                }
-
-                var entity = response.getEntity();
-                if (entity == null) {
-                    return new HopResponse(status, null, new byte[0], safeContentType(header(response, "Content-Type")));
-                }
-                long declaredLength = entity.getContentLength();
-                if (declaredLength > maxBytes) throw upstreamFailure();
-                byte[] body;
-                try (InputStream input = entity.getContent(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-                    byte[] buffer = new byte[8192];
-                    int total = 0;
-                    int read;
-                    while ((read = input.read(buffer)) != -1) {
-                        if (System.nanoTime() >= deadline || total > maxBytes - read) {
-                            throw upstreamFailure();
-                        }
-                        output.write(buffer, 0, read);
-                        total += read;
+                boolean entityHandled = false;
+                try {
+                    int status = response.getCode();
+                    String location = header(response, "Location");
+                    if (isRedirect(status)) {
+                        return new HopResponse(status, location, new byte[0], safeContentType(header(response, "Content-Type")));
                     }
-                    body = output.toByteArray();
+                    if (status < 200 || status >= 300) {
+                        return new HopResponse(status, null, new byte[0], "application/octet-stream");
+                    }
+
+                    String contentType = safeContentType(header(response, "Content-Type"));
+                    if (prefixMode && !isAllowedStylePrefixContentType(contentType)) {
+                        throw upstreamFailure();
+                    }
+                    var entity = response.getEntity();
+                    if (entity == null) {
+                        entityHandled = true;
+                        return new HopResponse(status, null, new byte[0], contentType);
+                    }
+                    long declaredLength = entity.getContentLength();
+                    validateDeclaredLength(declaredLength, maxBytes, prefixMode);
+                    byte[] body;
+                    try (InputStream input = entity.getContent()) {
+                        body = readBoundedBody(input, maxBytes, deadline, prefixMode, () -> request.cancel());
+                        entityHandled = true;
+                    }
+                    return new HopResponse(status, null, body, contentType);
+                } finally {
+                    if (!entityHandled && !request.isCancelled()) {
+                        request.cancel();
+                    }
                 }
-                return new HopResponse(status, null, body, safeContentType(header(response, "Content-Type")));
             }
         } catch (SafeFetchException exception) {
             throw exception;
@@ -267,6 +275,65 @@ public final class SafeFetcher {
             future.cancel(true);
             Thread.currentThread().interrupt();
             throw new UnknownHostException("DNS lookup interrupted");
+        }
+    }
+
+    static void validateDeclaredLength(long declaredLength, int maxBytes, boolean prefixMode) {
+        if (!prefixMode && declaredLength > maxBytes) {
+            throw upstreamFailure();
+        }
+    }
+
+    static boolean isAllowedStylePrefixContentType(String contentType) {
+        if (contentType == null) {
+            return false;
+        }
+        int parameters = contentType.indexOf(';');
+        String mediaType = (parameters < 0 ? contentType : contentType.substring(0, parameters))
+                .trim().toLowerCase(Locale.ROOT);
+        return switch (mediaType) {
+            case "text/html", "application/xhtml+xml", "text/css", "text/plain" -> true;
+            default -> false;
+        };
+    }
+
+    static byte[] readBoundedBody(InputStream input, int maxBytes, long deadline,
+                                  boolean prefixMode, Runnable cancelRequest) throws IOException {
+        try {
+            ByteArrayOutputStream output = new ByteArrayOutputStream(Math.min(maxBytes, 8192));
+            byte[] buffer = new byte[8192];
+            int total = 0;
+            int read;
+            if (prefixMode) {
+                while (total < maxBytes) {
+                    if (System.nanoTime() >= deadline) {
+                        throw upstreamFailure();
+                    }
+                    int limit = Math.min(buffer.length, maxBytes - total);
+                    read = input.read(buffer, 0, limit);
+                    if (read == -1) {
+                        return output.toByteArray();
+                    }
+                    if (System.nanoTime() >= deadline || read > maxBytes - total) {
+                        throw upstreamFailure();
+                    }
+                    output.write(buffer, 0, read);
+                    total += read;
+                }
+                cancelRequest.run();
+                return output.toByteArray();
+            }
+            while ((read = input.read(buffer)) != -1) {
+                if (System.nanoTime() >= deadline || total > maxBytes - read) {
+                    throw upstreamFailure();
+                }
+                output.write(buffer, 0, read);
+                total += read;
+            }
+            return output.toByteArray();
+        } catch (IOException | RuntimeException | Error exception) {
+            cancelRequest.run();
+            throw exception;
         }
     }
 
@@ -335,7 +402,7 @@ public final class SafeFetcher {
 
     @FunctionalInterface
     interface RemoteFetch {
-        FetchResult fetch(URI url, int maxBytes, boolean sameOriginOnly) throws InterruptedException;
+        FetchResult fetch(URI url, int maxBytes, boolean sameOriginOnly, boolean prefixMode) throws InterruptedException;
     }
 
     private static ThreadFactory daemonThreads(String prefix) {
@@ -364,7 +431,7 @@ public final class SafeFetcher {
         }
     }
 
-    private record CacheKey(String url, int maxBytes, boolean sameOriginOnly) {}
+    private record CacheKey(String url, int maxBytes, boolean sameOriginOnly, boolean prefixMode) {}
 
     private static final class CachedFetch {
         private final FetchResult result;

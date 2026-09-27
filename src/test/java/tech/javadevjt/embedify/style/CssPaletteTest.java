@@ -1,7 +1,6 @@
 package tech.javadevjt.embedify.style;
 
 import static org.junit.jupiter.api.Assertions.*;
-import java.net.URI;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
@@ -29,11 +28,15 @@ class CssPaletteTest {
             assertEquals("#112233", result.text());
         });
     }
-    @Test void linkedStylesheetsMustKeepOrigin() {
-        URI origin = URI.create("https://example.org/path");
-        assertTrue(StyleService.sameOrigin(origin, URI.create("https://example.org:443/site.css")));
-        assertFalse(StyleService.sameOrigin(origin, URI.create("http://example.org/site.css")));
-        assertFalse(StyleService.sameOrigin(origin, URI.create("https://cdn.example.org/site.css")));
-        assertFalse(StyleService.sameOrigin(origin, URI.create("https://example.org:444/site.css")));
+    @Test void choosesBodyFontInsteadOfUnusedFontFacesOrCodeFontTokens() {
+        var result = CssPalette.extract("""
+            :root { --ds-font-family-body: Arial, sans-serif; --ds-surface:#fff; --ds-link:#1868db; }
+            body { font-family:var(--ds-font-family-body); color:#292a2e; }
+            @font-face { font-family: 'Example Mono'; src:url(https://cdn.example/mono.woff2); }
+            :root { --ds-font-family-code:monospace; }
+            """, List.of());
+        assertEquals("sans", result.font());
+        assertEquals("#ffffff", result.background());
+        assertEquals("#1868db", result.accent());
     }
 }
