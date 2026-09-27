@@ -2,6 +2,14 @@
 
 Embedify is live at https://embedify.javadevjt.tech. The repository `javaDevJT/embedify` and GHCR package remain **private** until the owner explicitly approves publication.
 
+## Calendar support footer release — September 27, 2026
+
+- Application source: `73a8229b1735c1c5c602abd9a0bedc325dc5e9eb`; successful GitHub Actions run `36346069929` passed backend and UI checks and published the private image.
+- Image: `ghcr.io/javadevjt/embedify@sha256:9ccd31d9ba3506e7a644a31d025459477c6487b1dbc5a52b728c3aebe26a409c`.
+- TrueNAS update job `208957` succeeded. The complete saved configuration matched the requested image-only change, and the app subsequently reported RUNNING on that digest.
+- The embed now retains **Calendar by Embedify** and adds a plain **Buy me a coffee** link to the owner's profile beside it. The footer can wrap on narrow screens. No ad code or third-party scripts were added.
+- Browser inspection confirmed both link destinations and new-tab protections. At 390 px, both links fit without horizontal page overflow. The public embed HTML and CSS match source bytes, health returns HTTP 200, and `no-transform` remains present. Repository and image remain private.
+
 ## Style-import release — September 27, 2026
 
 - Application source: `25383d1919cadde33121172ea5d2e0f688213c72`.
