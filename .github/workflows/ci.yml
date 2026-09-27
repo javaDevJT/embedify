@@ -78,4 +78,5 @@ jobs:
           IMAGE: ${{ steps.image.outputs.name }}
           DIGEST: ${{ steps.build.outputs.digest }}
           SHA_TAG: sha-${{ github.sha }}
-        run: printf 'Image: `%s:%s`\nDigest: `%s@%s`\n' "$IMAGE" "$SHA_TAG" "$IMAGE" "$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          printf 'Image: `%s:%s`\nDigest: `%s@%s`\n' "$IMAGE" "$SHA_TAG" "$IMAGE" "$DIGEST" >> "$GITHUB_STEP_SUMMARY"
