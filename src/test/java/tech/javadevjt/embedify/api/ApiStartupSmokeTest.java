@@ -1,5 +1,7 @@
 package tech.javadevjt.embedify.api;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -65,5 +67,14 @@ class ApiStartupSmokeTest {
         mockMvc.perform(get("/missing-resource.svg"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Not Found"));
+    }
+
+    @Test
+    void publicLicenseMatchesTheCanonicalRepositoryLicense() throws Exception {
+        mockMvc.perform(get("/license"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith("text/plain"))
+                .andExpect(content().string(Files.readString(Path.of("LICENSE"))))
+                .andExpect(header().string("X-Frame-Options", "DENY"));
     }
 }

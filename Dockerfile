@@ -8,6 +8,7 @@ COPY pom.xml ./
 RUN mvn -B -ntp dependency:go-offline
 
 COPY src/ ./src/
+COPY LICENSE ./
 COPY scripts/ContainerHealthCheck.java /tmp/ContainerHealthCheck.java
 
 RUN set -eu; \

@@ -1,0 +1,91 @@
+Embedify Hosted-Use License 1.0
+September 27, 2026
+
+Copyright (c) 2026 javaDevJT. All rights reserved except as stated below.
+
+This license applies to the original Embedify source code, compiled software,
+documentation, and assets for which javaDevJT controls the relevant rights
+(the "Materials"). The "Hosted Service" means Embedify as provided by
+javaDevJT at https://embedify.javadevjt.tech, including its calendar embeds.
+
+1. Permitted hosted use
+
+You may access and use the Hosted Service for personal, educational,
+organizational, and commercial purposes. You may display its calendar embeds
+on websites you own or are authorized to manage. You may use the service's
+documented settings, URL parameters, and style-suggestion features. No license
+fee or donation is required for these permitted uses.
+
+If source code is made available to you, you may read it for inspection.
+Source availability does not grant permission to run a separate installation.
+
+2. Copies necessary for permitted use
+
+You may allow your browser to download, execute, display, and cache the files
+normally delivered by the Hosted Service as necessary for permitted use.
+
+You may copy, save, share, and publish calendar links and iframe embed snippets
+provided by the Hosted Service. You may adjust their documented URL settings
+and the surrounding iframe markup, such as dimensions and accessibility
+attributes, to integrate the hosted calendar into your website. This does not
+authorize copying or modifying the application's source code or assets.
+
+You may reproduce this license unchanged to communicate the applicable terms.
+These are narrow exceptions to the copying restrictions below, not a general
+right to copy, extract, or reuse the Materials.
+
+3. Restrictions and reserved rights
+
+Except for the permissions above, separate written permission from javaDevJT,
+or rights preserved by section 4, you may not:
+
+- Copy, download, clone, or extract the Materials for separate use, including
+  building, running, deploying, self-hosting, or operating another instance.
+- Edit, modify, adapt, translate, or create derivative works of the Materials.
+- Publish, mirror, distribute, redistribute, sell, sublicense, or otherwise
+  provide copies of the Materials to others, in source or compiled form.
+- Remove or alter copyright or license notices in permitted copies.
+
+All rights not expressly granted are reserved. This is a custom restricted-use
+license, not an open-source license. Repository access alone does not grant
+additional rights to modify, self-host, or redistribute Embedify.
+
+4. Other rights and materials
+
+This license does not claim ownership of your calendar data, third-party feeds,
+CSS you supply, or the resulting palette values. Their existing rights remain
+with their respective owners. You remain responsible for permission to use
+and publish the calendar content you provide.
+
+Third-party libraries, components, and assets remain subject to their own
+licenses and notices. This license does not restrict permissions independently
+granted by those licenses or rights that applicable law does not allow the
+copyright holder to restrict.
+
+This license also does not override rights separately granted under a hosting
+platform's applicable terms. In particular, making a repository public on
+GitHub may grant viewing and forking rights through GitHub. Those platform
+rights are not an additional general license to modify, self-host, or
+redistribute the Materials outside the scope of that separate grant.
+
+5. Termination and service availability
+
+The permissions granted by this license terminate if you breach its terms.
+After termination, stop using the Materials under this license and remove
+unauthorized copies under your control. Rights independently preserved by
+section 4 are unaffected.
+
+This license does not promise continued hosting, availability, maintenance,
+updates, or support. The Hosted Service may be changed or discontinued.
+
+6. Disclaimer
+
+TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE MATERIALS AND HOSTED SERVICE ARE
+PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTIES OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
+AND NON-INFRINGEMENT. TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE COPYRIGHT
+HOLDER IS NOT LIABLE FOR CLAIMS, DAMAGES, OR OTHER LIABILITY ARISING FROM THE
+MATERIALS, HOSTED SERVICE, OR THEIR USE, WHETHER IN CONTRACT, TORT, OR OTHERWISE.
+
+Uses outside the permissions above require separate written permission from
+javaDevJT.

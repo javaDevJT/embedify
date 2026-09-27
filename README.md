@@ -5,10 +5,19 @@ Calendar feeds, made to fit your website. A single Spring Boot 4 service serves 
 - [Design, API, and work record](docs/design.md)
 - [Deployment and operations](docs/deployment.md)
 - [Small-ad options and policy research](docs/monetization.md)
+- [Hosted-use license](LICENSE) ([website copy](https://embedify.javadevjt.tech/license))
 
 The repository stays private until the owner approves publication. The app is live at `https://embedify.javadevjt.tech`.
 
-## Run locally
+## License
+
+Embedify is source-available under the custom [Embedify Hosted-Use License 1.0](LICENSE), not an open-source license. Personal, organizational, and commercial use of the hosted site and its calendar embeds is allowed without a license fee. Normal browser caching, sharing generated embed snippets, and supported URL customization are allowed. Self-hosting, copying the application, modifying its source, and redistributing it require separate written permission, subject to third-party licenses, applicable law, and hosting-platform rights.
+
+Public GitHub repositories remain viewable and forkable under GitHub's own terms; this license does not override those platform grants. The repository remains private until the owner approves publication.
+
+## Maintainer: run locally
+
+The build and deployment instructions are for the copyright holder and separately authorized maintainers. They do not grant a self-hosting license.
 
 Use Java 25 or newer and Maven 3.9+:
 

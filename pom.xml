@@ -13,7 +13,13 @@
     <dependency><groupId>org.jsoup</groupId><artifactId>jsoup</artifactId><version>1.23.2</version></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc-test</artifactId><scope>test</scope></dependency>
   </dependencies>
-  <build><plugins>
+  <licenses><license><name>Embedify Hosted-Use License 1.0</name><url>https://embedify.javadevjt.tech/license</url></license></licenses>
+  <build>
+    <resources>
+      <resource><directory>src/main/resources</directory></resource>
+      <resource><directory>${project.basedir}</directory><includes><include>LICENSE</include></includes></resource>
+    </resources>
+    <plugins>
     <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId><configuration><layers><enabled>true</enabled></layers></configuration></plugin>
   </plugins></build>
 </project>
