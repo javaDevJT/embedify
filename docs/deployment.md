@@ -2,7 +2,17 @@
 
 Embedify is live at https://embedify.javadevjt.tech. The repository `javaDevJT/embedify` and GHCR package remain **private** until the owner explicitly approves publication.
 
-## Verified release — September 27, 2026
+## Style-import release — September 27, 2026
+
+- Application source: `25383d1919cadde33121172ea5d2e0f688213c72`.
+- GitHub Actions run `36339911043` passed all 32 backend tests and UI checks, then published the private image.
+- Image: `ghcr.io/javadevjt/embedify@sha256:d6481823ea92a81b7a674cba33adf640ed50a714ee497c17eaec8a4f9737a394`.
+- TrueNAS update job `208752` succeeded; the app subsequently reported RUNNING on this digest. The helper compared the complete saved configuration to the requested configuration: only the image changed, preserving networking, environment, ports, limits, user, mounts, and container restrictions.
+- LAN and public health checks passed. The actual Atlassian Confluence URL returned HTTP 200 with white background/surface, slate text (`#292a2e`), blue accent (`#357de8`), and sans-serif font category. The public browser showed the same palette without console errors.
+- Applying the Atlassian suggestion updated the browser's color controls, preview, and generated embed URL. The CalendarLabs feed returned Labor Day and a 60-second refresh interval. Public builder/embed HTML, `app.js`, and `app.css` matched source bytes; `no-transform` remains present.
+- Repository and package visibility were rechecked as private. AdSense exploration is documented in [monetization.md](monetization.md); no advertising or tracking was enabled.
+
+## Initial release — September 27, 2026
 
 - Application source: `24ab6eb99bcb1c782a86afa3a03be8601e125713`.
 - Successful GitHub Actions run: `36334056651`; all 27 backend tests and the frontend checks passed.
