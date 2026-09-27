@@ -13,6 +13,33 @@ Use an optional, clearly labeled **direct-sponsor footer** inside calendars. Kee
 | Direct sponsor inside the embed | Best fit for a very small footer | Requires a sponsor relationship and a clear customer-facing choice; avoid third-party ad scripts and tracking. |
 | Existing Buy Me a Coffee support link | Already available on the builder | Voluntary support, not advertising. |
 
+## Other platforms for calendar embeds
+
+Checked September 27, 2026. An ad tag that creates an iframe is not, by itself, permission to distribute that ad inside a calendar widget on arbitrary customer domains.
+
+| Platform | What is established | Embedify decision |
+| --- | --- | --- |
+| Adsterra | Publisher terms clause 4.7 permits an ad tag in an iframe only with prior written consent and restricts it to approved publisher sites. Small banner formats include 320×50. | A possible automatic-network option only after written approval of the exact distributed-calendar model and host-domain requirements. |
+| A-ADS | Offers iframe units and small banner examples. One official guide says cross-domain reuse is not prohibited, but limits unique impressions to the assigned domain; its separate FAQ says each website needs its own unit. | Conditional lead. The conflicting domain rules and unclear nested-frame attribution need provider clarification before integration. |
+| AdButler | Documents iframe and HTML-only iframe zone tags. Its setup documentation says a zone is empty until a campaign and creative are assigned. | Can deliver direct-sponsor campaigns through iframe tags; it is not automatic advertiser demand. Confirm any separately connected network's rules. |
+| Revive Adserver | Documents an iframe invocation tag for banner/button/rectangle zones and delivery of campaigns linked to each zone. | Another direct-campaign delivery option. Its tag support does not authorize another network's ads or provide automatic advertiser demand. |
+
+For automated inventory, the clearest next investigation is Adsterra's written-consent route. Describe an Embedify-hosted calendar iframe on customer-controlled domains, a single 320×50 banner, and the required host registration, referrer, consent, and content-review behavior. This is a proposed approval request, not approval already obtained; no providers have been contacted.
+
+For the smallest design, retain the proposed 32–36 px direct-sponsor footer. A plain operator-configured sponsor link needs no additional ad-server service. Add campaign-management software only when sponsor rotation/reporting makes it useful. Neither network above has been verified as a blanket-approved, automatic-fill solution for arbitrary customer embeds.
+
+Sources:
+
+- [Adsterra publisher terms, clause 4.7](https://adsterra.com/publishers-terms-managed/)
+- [Adsterra banner formats](https://adsterra.com/blog/how-banner-ads-make-money/)
+- [A-ADS placement guide](https://help.aads.com/en/article/how-to-place-an-ad-unit-code-correctly-12n1ti5/)
+- [A-ADS multiple-websites FAQ](https://help.aads.com/en/article/can-i-use-the-same-ad-unit-code-for-multiple-websites-eqnhjo/)
+- [A-ADS iframe formats](https://help.aads.com/en/article/accepted-ad-formats-at-aads-1g5jiec/)
+- [A-ADS embedding examples](https://help.aads.com/en/article/how-to-embed-ad-units-9frqcl/)
+- [AdButler tag types](https://www.adbutler.com/help/article/types-of-zone-tag)
+- [AdButler zone setup and empty-zone behavior](https://www.adbutler.com/help/article/creating-zones)
+- [Revive zone invocation tags](https://revive-adserver.atlassian.net/wiki/spaces/DOCS/pages/721005)
+
 ## Calendar footer concept
 
 A 32–36 px row beneath the calendar, separated by a light border:
