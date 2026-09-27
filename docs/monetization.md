@@ -2,7 +2,11 @@
 
 Research checked September 27, 2026. This is a proposal; no ads or tracking have been enabled.
 
-## Recommendation
+## Current decision
+
+On September 27, 2026, the owner chose a text-only **Buy me a coffee** link in the calendar footer, replacing the Embedify attribution link. It points to `https://buymeacoffee.com/javadevjt`, opens a new tab, and appears in the builder preview as well as the embed. The existing understated footer styling is retained. This is a normal link, with no third-party scripts or advertising requests.
+
+## Advertising options retained for reference
 
 Use an optional, clearly labeled **direct-sponsor footer** inside calendars. Keep AdSense outside the calendar iframe, on an approved top-level content page if the owner wants that separate channel.
 
@@ -39,6 +43,21 @@ Sources:
 - [AdButler tag types](https://www.adbutler.com/help/article/types-of-zone-tag)
 - [AdButler zone setup and empty-zone behavior](https://www.adbutler.com/help/article/creating-zones)
 - [Revive zone invocation tags](https://revive-adserver.atlassian.net/wiki/spaces/DOCS/pages/721005)
+
+## Text-only networks
+
+Checked September 27, 2026. **EthicalAds is the closest verified format match**: its client supports text-only placements, flat and dark themes, CSS color/font customization, and a compact fixed-footer option. Integration is one asynchronous script plus a placement element. Its standard ad copy is up to 100 characters with an optional headline/call to action.
+
+Eligibility remains separate from format support: EthicalAds seeks developer-focused sites, normally with at least 50,000 monthly pageviews (its FAQ notes occasional exceptions). Its published policy requires placement approval, a visible ad, and only one ad per page. It does not explicitly settle ads inside a calendar iframe distributed across customer sites; that use still needs confirmation. General calendar viewers may not match its developer audience.
+
+Carbon's Native CPC product also offers custom text mentions, but describes desktop-only placements on selected design/development websites. It is a secondary format lead, not verified permission for Embedify's iframe distribution.
+
+- [EthicalAds client, text placements, themes, and setup](https://ethical-ad-client.readthedocs.io/en/latest/)
+- [EthicalAds publisher eligibility](https://www.ethicalads.io/publishers/faq/)
+- [EthicalAds publisher guide](https://www.ethicalads.io/publisher-guide/)
+- [EthicalAds placement policy](https://www.ethicalads.io/publisher-policy/)
+- [EthicalAds standard creative specs](https://www.ethicalads.io/advertisers/ad-design-and-specs/)
+- [Carbon Native CPC text placements](https://www.carbonads.net/native-cpc)
 
 ## Calendar footer concept
 
