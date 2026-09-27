@@ -1,0 +1,12 @@
+target/
+.DS_Store
+.idea/
+.serena/
+.env
+.env.*
+!.env.example
+artifacts/
+*.local.*
+node_modules/
+.playwright-cli/
+output/

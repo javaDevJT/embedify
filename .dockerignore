@@ -1,0 +1,14 @@
+.git
+.gitignore
+.github
+.env
+.env.*
+.idea
+.serena
+.playwright-cli
+.DS_Store
+artifacts
+node_modules
+**/node_modules
+target
+**/target

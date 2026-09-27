@@ -1,0 +1,26 @@
+name: embedify
+
+services:
+  embedify:
+    image: ${EMBEDIFY_IMAGE:?Set EMBEDIFY_IMAGE to the published GHCR digest}
+    container_name: embedify
+    restart: unless-stopped
+    user: "10001:10001"
+    environment:
+      EMBEDIFY_TRUSTED_PROXIES: "${EMBEDIFY_TRUSTED_PROXIES:-}"
+    ports:
+      - target: 8080
+        published: "${EMBEDIFY_PORT:-30024}"
+        host_ip: "${EMBEDIFY_BIND_ADDRESS:-192.168.0.2}"
+        protocol: tcp
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    stop_grace_period: 30s
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,uid=10001,gid=10001,mode=1777

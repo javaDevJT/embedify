@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <meta name="theme-color" content="#faf8ff">
+    <title>Embedify — public calendar feed builder</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="/app.css">
+    <script defer src="/config.js"></script>
+    <script defer src="/app.js"></script>
+  </head>
+  <body data-page="builder">
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Embedify home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false"><rect x="2" y="3" width="20" height="19" rx="4" fill="currentColor"/><path d="M2 8h20M8 2v4m8-4v4" fill="none" stroke="white" stroke-linecap="round" stroke-width="1.7"/><path d="M7 12h3v3H7zm7 0h3v3h-3z" fill="white"/></svg>
+          </span>
+          <span class="brand-name">Embedify</span>
+          <span class="brand-tag">PUBLIC CALENDAR WIDGET</span>
+        </a>
+        <nav class="topnav" aria-label="Main navigation">
+          <a href="#builder">Builder</a>
+          <a href="#how-it-works">How it works</a>
+        </nav>
+        <a class="coffee-link" href="https://buymeacoffee.com/javadevjt" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Buy me a coffee <span aria-hidden="true">↗</span></a>
+      </header>
+
+      <main>
+        <section class="page-intro" aria-labelledby="page-title">
+          <div>
+            <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span> PUBLIC CALENDAR FEED BUILDER</p>
+            <h1 id="page-title">Your calendar, your website.</h1>
+            <p class="intro-copy">Bring public calendars together in a clean, responsive embed. Add the feeds, tune the details, then copy a link or iframe.</p>
+          </div>
+          <p class="intro-side-note"><span class="intro-side-icon" aria-hidden="true">✓</span> No account required<br><span>Up to five public feeds</span></p>
+        </section>
+
+        <section id="builder" class="workspace" aria-label="Calendar builder">
+          <aside class="settings-column" aria-label="Calendar settings">
+            <form id="builder-form" class="settings-panel" novalidate>
+              <section class="settings-section" aria-labelledby="feeds-title">
+                <div class="section-heading">
+                  <span class="step-number">1</span>
+                  <div><h2 id="feeds-title">Public feeds</h2><p>Add one to five calendar URLs.</p></div>
+                </div>
+                <div id="feed-list" class="feed-list">
+                  <div class="feed-row" data-feed-row>
+                    <label for="feed-0">Feed 1 URL</label>
+                    <div class="feed-input-wrap">
+                      <input id="feed-0" class="feed-url" type="url" inputmode="url" maxlength="2048" autocomplete="off" spellcheck="false" placeholder="https://example.org/calendar.ics" aria-describedby="feed-help feed-warning">
+                      <button class="remove-feed" type="button" aria-label="Remove feed 1" disabled><span aria-hidden="true">×</span></button>
+                    </div>
+                  </div>
+                </div>
+                <div class="feed-actions">
+                  <button id="add-feed" class="text-button" type="button"><span aria-hidden="true">＋</span> Add another feed</button>
+                  <span id="feed-count" class="count-note">1 / 5</span>
+                </div>
+                <button id="example-feed" class="example-feed" type="button">Try a public US holidays example <span aria-hidden="true">↗</span></button>
+                <p class="field-help compact-help">The example loads only after you select it.</p>
+                <p id="feed-help" class="sr-only">Use a public HTTPS calendar feed URL.</p>
+                <p id="feed-warning" class="privacy-note"><span class="privacy-mark" aria-hidden="true">!</span><span>Feed URLs are included in the embed link and visible to its viewers. Events are cached in memory for up to 60 seconds. Never use private or secret links.</span></p>
+                <p id="feed-validation" class="field-error" role="status" aria-live="polite"></p>
+              </section>
+
+              <section class="settings-section" aria-labelledby="appearance-title">
+                <div class="section-heading">
+                  <span class="step-number">2</span>
+                  <div><h2 id="appearance-title">Appearance &amp; controls</h2><p>Shape the calendar for your site.</p></div>
+                </div>
+                <label class="field-label" for="calendar-title">Calendar title</label>
+                <input id="calendar-title" class="text-input" type="text" maxlength="72" value="Shared calendar" autocomplete="off">
+
+                <div class="field-grid two-up">
+                  <div>
+                    <label class="field-label" for="timezone">Time zone</label>
+                    <input id="timezone" class="text-input" type="text" list="timezone-options" autocomplete="off" spellcheck="false">
+                    <datalist id="timezone-options"></datalist>
+                  </div>
+                  <div>
+                    <label class="field-label" for="week-start">Week starts</label>
+                    <select id="week-start" class="select-input"><option value="sun">Sunday</option><option value="mon">Monday</option></select>
+                  </div>
+                </div>
+                <div class="field-grid two-up">
+                  <div>
+                    <label class="field-label" for="calendar-view">Starting view</label>
+                    <select id="calendar-view" class="select-input"><option value="month">Month</option><option value="agenda">Agenda</option></select>
+                  </div>
+                  <div>
+                    <label class="field-label" for="calendar-size">Type size</label>
+                    <select id="calendar-size" class="select-input"><option value="compact">Compact</option><option value="standard">Standard</option><option value="large">Large</option></select>
+                  </div>
+                </div>
+
+                <p class="field-label color-heading">Calendar colors</p>
+                <div class="color-grid">
+                  <label class="color-control"><span>Background</span><input id="color-background" type="color" value="#faf8ff"></label>
+                  <label class="color-control"><span>Surface</span><input id="color-surface" type="color" value="#ffffff"></label>
+                  <label class="color-control"><span>Text</span><input id="color-text" type="color" value="#131b2e"></label>
+                  <label class="color-control"><span>Accent</span><input id="color-accent" type="color" value="#0053db"></label>
+                </div>
+                <div class="field-grid two-up">
+                  <div>
+                    <label class="field-label" for="font-category">Font category</label>
+                    <select id="font-category" class="select-input"><option value="sans">Sans serif</option><option value="serif">Serif</option><option value="mono">Monospaced</option></select>
+                  </div>
+                  <div>
+                    <label class="field-label" for="corner-style">Corner radius</label>
+                    <select id="corner-style" class="select-input"><option value="soft">Soft</option><option value="square">Square</option><option value="round">Round</option></select>
+                  </div>
+                </div>
+                <label class="field-label density-label" for="density">Calendar density</label>
+                <select id="density" class="select-input"><option value="comfortable">Comfortable</option><option value="compact">Compact</option><option value="airy">Airy</option></select>
+              </section>
+
+              <section class="settings-section style-section" aria-labelledby="style-title">
+                <div class="section-heading">
+                  <span class="step-number">3</span>
+                  <div><h2 id="style-title">Match your style</h2><p>Review a palette suggestion before applying.</p></div>
+                </div>
+                <div class="choice-row" role="radiogroup" aria-label="Style source">
+                  <label><input type="radio" name="style-source" value="css" checked><span>Paste CSS</span></label>
+                  <label><input type="radio" name="style-source" value="url"><span>Public URL</span></label>
+                </div>
+                <div id="style-css-panel">
+                  <label class="sr-only" for="style-css">CSS sample to inspect</label>
+                  <textarea id="style-css" class="text-input code-input" rows="4" maxlength="65536" placeholder=":root { --paper: #faf8ff; --ink: #131b2e; --blue: #0053db; }"></textarea>
+                  <p class="field-help compact-help">CSS is only inspected for colors and font hints. It is never run.</p>
+                </div>
+                <div id="style-url-panel" hidden>
+                  <label class="sr-only" for="style-url">Public HTTPS page or stylesheet URL</label>
+                  <input id="style-url" class="text-input" type="url" maxlength="2048" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://example.org/about">
+                </div>
+                <button id="suggest-style" class="secondary-button" type="button">Suggest a palette <span aria-hidden="true">→</span></button>
+                <p id="style-status" class="style-status" role="status" aria-live="polite"></p>
+                <div id="style-suggestion" class="style-suggestion" hidden>
+                  <div class="suggestion-swatches" aria-label="Suggested color palette"></div>
+                  <p class="suggestion-font"></p>
+                  <ul class="suggestion-notes"></ul>
+                  <button id="apply-style" class="text-button" type="button">Apply this palette <span aria-hidden="true">↗</span></button>
+                </div>
+              </section>
+            </form>
+          </aside>
+
+          <div class="preview-column">
+            <section class="preview-panel" aria-labelledby="preview-title">
+              <header class="preview-header">
+                <div class="preview-title-group">
+                  <span class="preview-status-mark" aria-hidden="true"><span></span></span>
+                  <div><p class="eyebrow">PREVIEW</p><h2 id="preview-title">Calendar preview</h2></div>
+                </div>
+                <div class="preview-width-control">
+                  <span>Preview width</span>
+                  <div id="preview-width" class="preview-size-buttons" role="group" aria-label="Preview width">
+                    <button type="button" class="preview-size-button" data-preview-width="100%" aria-pressed="true">Full</button>
+                    <button type="button" class="preview-size-button" data-preview-width="768px" aria-pressed="false">768</button>
+                    <button type="button" class="preview-size-button" data-preview-width="390px" aria-pressed="false">390</button>
+                  </div>
+                </div>
+              </header>
+              <p id="preview-notice" class="demo-notice" role="status" aria-live="polite"></p>
+              <div id="preview-viewport" class="preview-viewport"><div class="preview-canvas"><div id="calendar-root" class="calendar-root"></div></div></div>
+            </section>
+
+            <section class="export-panel" aria-labelledby="share-title">
+              <header class="export-header">
+                <div class="export-title-group"><span class="export-icon" aria-hidden="true">&lt;/&gt;</span><div><p class="eyebrow">READY TO SHARE</p><h2 id="share-title">Embed your calendar</h2></div></div>
+                <span id="export-ready" class="export-ready"><span aria-hidden="true">✓</span> Ready to copy</span>
+              </header>
+              <p class="field-help">Use the link on its own, or add the iframe to your site.</p>
+              <div class="export-field-row">
+                <div class="export-field"><label class="field-label" for="embed-url">Embed URL</label><input id="embed-url" class="text-input share-url" type="text" readonly spellcheck="false"></div>
+                <button id="copy-url" class="secondary-button" type="button">Copy URL</button>
+              </div>
+              <div class="export-field-row iframe-row">
+                <div class="export-field"><label class="field-label" for="iframe-code">Iframe code</label><textarea id="iframe-code" class="text-input code-input iframe-code" rows="3" readonly spellcheck="false"></textarea></div>
+                <button id="copy-iframe" class="primary-button" type="button">Copy iframe code</button>
+              </div>
+              <p id="copy-status" class="copy-status" role="status" aria-live="polite"></p>
+            </section>
+          </div>
+        </section>
+
+        <section id="how-it-works" class="how-section" aria-labelledby="how-title">
+          <div class="how-heading"><p class="eyebrow">THREE QUICK STEPS</p><h2 id="how-title">How Embedify works</h2><p>No account needed. Your event details stay in the feed source.</p></div>
+          <div class="how-grid">
+            <article class="how-card"><span class="how-number">01</span><h3>Paste public feeds</h3><p>Connect calendar feeds from your school, team, or community. Only public HTTPS links can be used.</p></article>
+            <article class="how-card"><span class="how-number">02</span><h3>Customize the view</h3><p>Choose colors, font character, spacing, time zone, and how the week begins.</p></article>
+            <article class="how-card"><span class="how-number">03</span><h3>Copy and embed</h3><p>Preview month or agenda view, then copy a calendar link or iframe for your website.</p></article>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer"><a class="brand footer-brand" href="/" aria-label="Embedify home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="2" y="3" width="20" height="19" rx="4" fill="currentColor"/><path d="M2 8h20M8 2v4m8-4v4" fill="none" stroke="white" stroke-linecap="round" stroke-width="1.7"/><path d="M7 12h3v3H7zm7 0h3v3h-3z" fill="white"/></svg></span><span class="brand-name">Embedify</span></a><span>Public calendar feed builder</span><span>© <span id="year"></span> Embedify</span></footer>
+    </div>
+  </body>
+</html>
