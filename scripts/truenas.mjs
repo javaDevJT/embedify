@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 // Embedify-only TrueNAS helper. It can inspect or create this app; it cannot
-// update, replace, delete, or target any other app.
+// replace, delete, or target any other app. One scoped update connects it to NPM.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -17,7 +17,7 @@ const IMAGE_REPOSITORY = 'ghcr.io/javadevjt/embedify';
 const PROXY_NETWORK = 'ix-nginx-proxy-manager_default';
 const CONTROL_CA = resolve(import.meta.dir, 'truenas-control-plane.pem');
 const RPC_METHODS = new Set([
-  'auth.login_with_api_key', 'app.query', 'app.used_ports', 'docker.status', 'docker.network.query', 'app.create', 'core.get_jobs',
+  'auth.login_with_api_key', 'app.query', 'app.used_ports', 'docker.status', 'docker.network.query', 'app.create', 'app.config', 'app.update', 'core.get_jobs',
 ]);
 
 function validateCompose(config) {
@@ -194,6 +194,10 @@ function selfTest() {
     },
   };
   assert.equal(validateCompose(valid), valid);
+  const connected = connectProxyNetwork(structuredClone(valid));
+  assert.equal(connected.services[APP].image, valid.services[APP].image);
+  assert.deepEqual(connected.services[APP].networks, { proxy: null });
+  assert.deepEqual(connected.networks, { proxy: { name: PROXY_NETWORK, external: true } });
   const wrongImage = structuredClone(valid);
   wrongImage.services[APP].image = `${IMAGE_REPOSITORY}:sha-${'a'.repeat(40)}`;
   assert.throws(() => validateCompose(wrongImage));
@@ -214,9 +218,18 @@ function selfTest() {
   console.log('Embedify TrueNAS helper self-test passed.');
 }
 
+function connectProxyNetwork(config) {
+  validateCompose(config);
+  assert(!config.networks || Object.keys(config.networks).every(name => ['default', 'proxy'].includes(name)),
+    'Refusing to replace an unexpected application network.');
+  config.services[APP].networks = { proxy: null };
+  config.networks = { proxy: { name: PROXY_NETWORK, external: true } };
+  return config;
+}
+
 async function main() {
   const mode = process.argv[2];
-  assert(['inspect', 'create', 'proxy-network', 'self-test'].includes(mode), 'Usage: truenas.mjs inspect|create|proxy-network|self-test');
+  assert(['inspect', 'create', 'use-proxy-network', 'proxy-network', 'self-test'].includes(mode), 'Usage: truenas.mjs inspect|create|use-proxy-network|proxy-network|self-test');
   if (mode === 'self-test') return selfTest();
   const config = mode === 'create' ? readCompose() : undefined;
   const { rpc, close } = await connectTrueNAS();
@@ -238,6 +251,16 @@ async function main() {
     }
     assert.equal(process.argv[3], '--confirm', 'Creating the app requires an exact confirmation.');
     assert.equal(process.argv[4], APP, 'Exact TrueNAS app confirmation required.');
+    if (mode === 'use-proxy-network') {
+      assert.equal(rows.length, 1, 'Embedify must already exist.');
+      const current = await rpc('app.config', [APP]);
+      const updated = connectProxyNetwork(current);
+      const jobId = await rpc('app.update', [APP, { custom_compose_config: updated }]);
+      assert(Number.isInteger(jobId), 'TrueNAS did not return a valid update job id.');
+      await waitJob(rpc, jobId);
+      console.log(JSON.stringify(summarizeApp((await appRows(rpc))[0]), null, 2));
+      return;
+    }
     assert.equal(rows.length, 0, 'Embedify already exists; this helper never updates or replaces it.');
     assert.equal((await rpc('docker.status')).status, 'RUNNING', 'TrueNAS Docker service must be running.');
     const usedPorts = await rpc('app.used_ports');

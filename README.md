@@ -5,7 +5,7 @@ Calendar feeds, made to fit your website. A single Spring Boot 4 service serves 
 - [Design, API, and work record](docs/design.md)
 - [Deployment and operations](docs/deployment.md)
 
-Repository stays private until its owner approves publication. Public hosting is intended at `embedify.javadevjt.tech`.
+The repository stays private until the owner approves publication. The app is live at `https://embedify.javadevjt.tech`.
 
 ## Run locally
 

@@ -8,6 +8,8 @@ services:
     user: "10001:10001"
     environment:
       EMBEDIFY_TRUSTED_PROXIES: "${EMBEDIFY_TRUSTED_PROXIES:-}"
+    networks:
+      - proxy
     ports:
       - target: 8080
         published: "${EMBEDIFY_PORT:-30024}"
@@ -24,3 +26,8 @@ services:
     stop_grace_period: 30s
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=16m,uid=10001,gid=10001,mode=1777
+
+networks:
+  proxy:
+    external: true
+    name: ix-nginx-proxy-manager_default

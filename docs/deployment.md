@@ -1,37 +1,50 @@
 # Deployment
 
-Embedify is a single stateless Spring Boot process. It listens on container port 8080, has no database or persistent application volume, and fetches only public HTTPS calendar feeds. The container runs as UID/GID 10001 with a jlink runtime, a read-only root filesystem, dropped Linux capabilities, no privilege escalation, a bounded `/tmp`, and a JVM HTTP healthcheck against `/healthz`.
+Embedify is live at https://embedify.javadevjt.tech. The repository `javaDevJT/embedify` and GHCR package remain **private** until the owner explicitly approves publication.
+
+## Verified release — September 27, 2026
+
+- Application source: `24ab6eb99bcb1c782a86afa3a03be8601e125713`.
+- Successful GitHub Actions run: `36334056651`; all 27 backend tests and the frontend checks passed.
+- Image: `ghcr.io/javadevjt/embedify@sha256:2a532784098b55208438fef9cfe05eb9336630e226a11cddd845cac58d7f2381`. The registry digest matches the successful CI publication log.
+- TrueNAS app `embedify` is RUNNING using that digest. Saved runtime configuration specifies UID/GID 10001, a read-only root, all capabilities dropped, no privilege escalation, 512 MiB memory, one CPU, 128 PIDs, and a 16 MiB `/tmp` tmpfs. There are no persistent volumes.
+- The actual jlink image passed a local container health check under those restrictions and fetched a real HTTPS feed. The TrueNAS health endpoint and feed API also passed.
+- The public builder, embed HTML, JavaScript, and CSS match the source bytes. NPM's `no-transform` response header prevents Cloudflare from injecting its analytics script. The live browser has no console errors.
+- Browser checks covered the real CalendarLabs feed, month and agenda views, next-month navigation, mobile width, copy URL, CSS suggestions, public-page style suggestions, and the public embed inside an iframe on another origin.
+- The initial CI attempt exposed a YAML quoting error; commit `24ab6eb` corrected it. The successful run above is the release evidence. Later deployment/documentation changes do not change the image inputs.
+
+## Runtime and proxy
+
+`compose.yaml` targets TrueNAS at `192.168.0.2`. Port `30024` remains bound only to that LAN address for direct health checks; the container listens on 8080.
+
+NPM host #24 serves `embedify.javadevjt.tech` and forwards directly to `http://embedify:8080` through the existing external Docker network `ix-nginx-proxy-manager_default`. It uses the existing wildcard certificate, Force SSL, and HTTP/2. Other proxy hosts and certificates were preserved.
+
+The exact-name TrueNAS network query verified proxy subnets `172.16.2.0/24` and `fdd0:0:0:2::/64`. Only those subnets are configured in `EMBEDIFY_TRUSTED_PROXIES`. Direct container routing keeps NPM within that trust boundary without depending on host-port NAT. Recheck these ranges after changing Docker networking.
+
+[NPM advanced configuration](nginx-proxy-manager.conf) restores visitor addresses only from published Cloudflare ranges, disables access logging for this hostname, bounds request sizes/timeouts, and preserves application HTML. The builder denies external framing; only `/embed` permits it.
 
 ## Build and publish
 
-`.github/workflows/ci.yml` runs Maven verification and the UI checks for pull requests. A push to `main` or a manual `workflow_dispatch` runs the same checks and then publishes `ghcr.io/javadevjt/embedify:sha-<full-commit-sha>` as a private GHCR package. The publisher has only `contents: read` and `packages: write`. Buildx attaches maximum-detail provenance and an SBOM to the pushed image; the job summary records the resulting registry digest. The workflow pins its Actions to full commit SHAs, and Dependabot checks Actions and Docker base-image pins weekly.
+Pushes to `main` and manual runs execute Maven verification and UI checks before publishing the SHA-tagged private GHCR image. Actions and Docker bases are pinned. Buildx attaches provenance and an SBOM; the job summary records the immutable digest. Publication does not deploy automatically.
 
-BuildKit provenance and SBOM attestations travel with the private registry image. No attestation is published to a public transparency service. To inspect the pushed digest and attestations, use `docker buildx imagetools inspect ghcr.io/javadevjt/embedify:sha-<full-commit-sha>` from a machine authenticated to GHCR.
+Use the digest from a successful run, never a mutable tag, in the ignored local `.env`. The existing TrueNAS GHCR credential is used without copying credentials into Compose, the repository, or logs. The service has no persistent state to migrate; a restart clears its bounded caches.
 
-## TrueNAS and Nginx Proxy Manager
+## Scoped TrueNAS helper
 
-Read-only discovery on September 27, 2026 found the TrueNAS `nginx-proxy-manager` app running (catalog version 1.3.9, NPM API version 2.15.1). Its host ports are 30020 for the management UI, 30021 for HTTP proxy traffic, 30022 for HTTPS proxy traffic, and 30023 mapped to container port 4443. The read-only `app.used_ports` result did not include 30024, so this deployment reserves `192.168.0.2:30024` for Embedify, forwarding to container port 8080. Recheck that port immediately before creating the app.
+The helper uses Bun, the existing macOS Keychain credential `codex-truenas-mcp`, and the pinned control-plane certificate. It never prints the credential.
 
-The existing TrueNAS `ghcr` registry credential record is available for the private image pull. Reuse the registry record through the TrueNAS app configuration; do not copy its username or token into Compose, `.env`, this repository, logs, or deployment output. If the app creation form requires explicit registry selection, select the existing `ghcr` entry.
+- `bun scripts/truenas.mjs self-test` checks its guards.
+- `bun scripts/truenas.mjs inspect` reads only Embedify.
+- `bun scripts/truenas.mjs proxy-network` reads only the NPM network and prints its subnets.
+- `bun scripts/truenas.mjs create --confirm embedify` creates only this app from the reviewed Compose configuration. It refuses an existing app or occupied port.
+- `bun scripts/truenas.mjs use-proxy-network --confirm embedify` is the narrowly scoped migration used for the initial deployment. It preserves the existing app configuration and image while connecting only Embedify to NPM's network. It is not a general update or removal command.
 
-The NPM management API requires authentication. The owner supplied a signed-in browser session; inspection confirmed the existing wildcard certificate covers `embedify.javadevjt.tech`. Configure only the new Embedify host and preserve other proxy hosts and certificates.
+For a later image release, use TrueNAS's existing-app configuration to replace only the image digest while preserving the proxy network, environment, port, and container restrictions. Recheck the running digest, health, served assets, and public iframe flow after any update. Revalidate the pinned control-plane certificate if TrueNAS renews it.
 
-Configure the new proxy host to forward HTTPS traffic to `http://192.168.0.2:30024`, select the already-issued certificate for the chosen hostname, and enable Websockets only if the app later needs them. Keep the host public because the builder and iframe are designed for public calendar embeds. Embedify accepts public feed URLs only; never put private calendar feeds on a public page.
+## Cache and operating limits
 
-## Deploy a published image
+Feed pulls share a bounded 60-second cache and coalesce concurrent misses. Parsed results share a separate bounded 8 MiB cache with no extra freshness TTL; two uncached parses can run concurrently. Per-client request quotas, global outbound concurrency, response-size limits, and recurrence bounds limit abuse. Both caches are in memory; no calendar database exists.
 
-1. Copy `.env.example` to `.env` and replace the zero-filled SHA-256 digest with the registry digest from a successful main-branch or manual publish run.
-2. Confirm the `ghcr` registry credential is selected for this app in TrueNAS and that `192.168.0.2:30024` remains unused.
-3. Create the `embedify` custom app from `compose.yaml`, using the selected private image and the existing GHCR registry credential.
-4. Verify the container runs as UID 10001, `/healthz` is healthy, the bind is only on `192.168.0.2:30024`, the root filesystem is read-only, and the only writable mount is the bounded `/tmp` tmpfs.
-5. Add the one NPM proxy host after confirming the chosen hostname and certificate. Smoke-test the HTTPS builder and iframe using a public calendar feed; do not call the deployment complete from a container health result alone.
+Style suggestions extract literal CSS colors and a local font category. They do not execute CSS or page scripts. File uploads, credentials, private-network URLs, and non-HTTPS feed requests are rejected. Public embeds expose their feed URLs, so never use secret calendar links.
 
-Use the immutable tag and the digest reported by Actions when recording the deployed version. A successful local build does not prove the GHCR package, TrueNAS app, NPM proxy, public DNS, or served HTTPS page.
-
-### Scoped deployment helper
-
-Run `bun scripts/truenas.mjs self-test` to check its guards, `bun scripts/truenas.mjs inspect` to inspect only Embedify, and `bun scripts/truenas.mjs proxy-network` to read only the existing NPM network. The helper reads the existing TrueNAS credential from macOS Keychain without printing it and pins the control-plane TLS certificate. With the digest set in `.env`, `bun scripts/truenas.mjs create --confirm embedify` creates only this app, refuses an existing app or occupied port, and verifies non-root/read-only settings. It cannot replace or remove any app.
-
-On September 27, 2026, the exact-name `docker.network.query` check found `ix-nginx-proxy-manager_default` uses `172.16.2.0/24` and `fdd0:0:0:2::/64`. Set `EMBEDIFY_TRUSTED_PROXIES` to only those verified NPM subnets. Recheck after changing NPM's Docker networking. Embedify otherwise ignores forwarded client-IP headers and rate-limits by its direct peer.
-
-The owner has signed in to NPM. The new `embedify.javadevjt.tech` proxy is staged with upstream `192.168.0.2:30024`, the existing wildcard certificate, Force SSL, HTTP/2, and [the scoped advanced configuration](nginx-proxy-manager.conf). Save it only after the app is healthy. The config trusts Cloudflare IP headers only from published Cloudflare ranges and disables request logging for this host.
+Cloudflare may reject generic automation user agents; ordinary browser access and the public user flows above were verified. This does not require weakening the app's content security policy.
