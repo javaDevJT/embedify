@@ -2,6 +2,15 @@
 
 Embedify is live at https://embedify.javadevjt.tech. The repository `javaDevJT/embedify` and GHCR package remain **private** until the owner explicitly approves publication.
 
+## Hosted-use license release — September 27, 2026
+
+- Application source: `e4bd24e3e1e9fd89dc560347bbbe62b1c4fe60d3`; successful GitHub Actions run `36347867057` passed 33 backend tests and UI checks and published the private image.
+- Image: `ghcr.io/javadevjt/embedify@sha256:2b940ebd8472015475cdffb929ec4613382d7bc4be5bf40b2ad7495a9f9dacb0`.
+- TrueNAS update job `209032` succeeded. The helper verified the entire saved configuration against the requested image-only change; the app subsequently reported RUNNING on the new digest.
+- The canonical root `LICENSE` is packaged into the application and served at `/license`; the builder footer links to it. Hosted-site use and calendar embeds are allowed, including commercial use. Separate copying, modification, redistribution, and self-hosting require permission, subject to the license's stated exceptions. Both existing calendar-footer links remain intact.
+- Public `/license` returned HTTP 200 with `text/plain;charset=UTF-8` and exactly matched the repository file (SHA-256 `67548378824f9b1efe8e6a854cc1d9ffb28729bf6ea229ed3512161d555d806e`). The public builder also matched source bytes and included its License link; LAN and public health checks returned HTTP 200.
+- Browser verification followed the public footer link and displayed the license and its permission/restriction sections. The plaintext page triggered a cosmetic `/favicon.ico` 404; license navigation and content worked. Repository and GHCR package visibility were rechecked as private.
+
 ## Calendar support footer release — September 27, 2026
 
 - Application source: `73a8229b1735c1c5c602abd9a0bedc325dc5e9eb`; successful GitHub Actions run `36346069929` passed backend and UI checks and published the private image.
