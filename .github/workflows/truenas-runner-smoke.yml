@@ -33,6 +33,10 @@ jobs:
         with:
           driver: remote
           endpoint: ${{ env.BUILDKIT_HOST }}
+          driver-opts: |
+            cacert=/home/runner/.buildkit/ca.pem
+            cert=/home/runner/.buildkit/client.pem
+            key=/home/runner/.buildkit/client.key
       - name: Build OCI image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
