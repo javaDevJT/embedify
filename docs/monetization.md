@@ -4,7 +4,7 @@ Research checked September 27, 2026. This is a proposal; no ads or tracking have
 
 ## Current decision
 
-On September 27, 2026, the owner chose a text-only **Buy me a coffee** link in the calendar footer, replacing the Embedify attribution link. It points to `https://buymeacoffee.com/javadevjt`, opens a new tab, and appears in the builder preview as well as the embed. The existing understated footer styling is retained. This is a normal link, with no third-party scripts or advertising requests.
+On September 27, 2026, the owner chose a text-only **Buy me a coffee** link in the embed footer, replacing the Embedify attribution link. It points to `https://buymeacoffee.com/javadevjt` and opens a new tab. The existing understated footer styling is retained. This is a normal link, with no third-party scripts or advertising requests.
 
 ## Advertising options retained for reference
 
@@ -15,7 +15,7 @@ Use an optional, clearly labeled **direct-sponsor footer** inside calendars. Kee
 | AdSense inside the calendar iframe | Not viable under the published rule | Google's AdSense policy FAQ explicitly prohibits ads in a frame within another page. |
 | AdSense on an owned top-level page | Possible after review | Site ownership, Ready status, meaningful publisher content, applicable consent, and Google resource permissions are required. The builder's suitability is uncertain because it is primarily an interactive tool. |
 | Direct sponsor inside the embed | Best fit for a very small footer | Requires a sponsor relationship and a clear customer-facing choice; avoid third-party ad scripts and tracking. |
-| Existing Buy Me a Coffee support link | Already available on the builder | Voluntary support, not advertising. |
+| Existing Buy Me a Coffee support link | Available on the builder and in the embed footer | Voluntary support, not advertising. |
 
 ## Other platforms for calendar embeds
 
