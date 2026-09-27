@@ -4,7 +4,7 @@ Research checked September 27, 2026. This is a proposal; no ads or tracking have
 
 ## Current decision
 
-On September 27, 2026, the owner chose a text-only **Buy me a coffee** link in the embed footer, replacing the Embedify attribution link. It points to `https://buymeacoffee.com/javadevjt` and opens a new tab. The existing understated footer styling is retained. This is a normal link, with no third-party scripts or advertising requests.
+On September 27, 2026, the owner chose a text-only **Buy me a coffee** link beside the existing **Calendar by Embedify** attribution in the embed footer. Both links remain. The support link points to `https://buymeacoffee.com/javadevjt` and opens a new tab. The footer retains its understated styling and wraps the links on narrow screens. These are normal links, with no third-party scripts or advertising requests.
 
 ## Advertising options retained for reference
 
