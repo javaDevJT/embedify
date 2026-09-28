@@ -49,7 +49,16 @@ Workers consume the HTTP contract above; backend exports `tech.javadevjt.embedif
 
 - Buy Me a Coffee: `https://buymeacoffee.com/javadevjt`.
 - Public HTTPS feeds only, confirmed by the user.
+
 - The user rejected the initial visual design and requested a Stitch redesign. Stitch project `396617582496486596` is private; generated screen `2aece2e815c8419190d6da888de11d33`, design system `assets/b1643b6912294fbba20c52ac46543bf6` (Precision Slate Embed). Source exports and request are retained under ignored `artifacts/stitch/`; the implemented static UI is the reviewable deliverable. Keep the generated slate/blue visual direction, adapt it to existing working features, and omit mock controls and unsupported marketing claims.
+
+## Event title follow-up, September 28, 2026
+
+- Primary owns cell containment, palette-aware overflow tooltips, removal of the loaded-feed success banner, browser checks, and release. The event list now uses a zero-minimum grid column so a long title cannot enlarge its day cell. Month titles ellipsize and show their complete bounded text in a native popover; agenda titles wrap. No dependency was added.
+- Tooltips inherit the selected calendar surface, text, accent, font, and corner style. They open only for clipped titles on hover or focus, stay available while hovered, fit within the viewport, and close on Escape without moving focus. The successful-load message is empty in both builder and embed.
+- Read-only reviewer `/root/tooltip_accessibility` completed at base `61afe2c`; primary accepted and addressed its findings on unlinked focus semantics, horizontal offscreen anchors, and resize while focused. Requested worker configuration: `gpt-6-luna` / `max`, resolved against the September 28 native catalog (one callable Luna, maximum supported effort). Actual backend model fields and priority are unexposed. Handoff consumed; native completion released the worker.
+- The synthetic browser check reproduced cell overflow on the previous UI and passed on the corrected UI at desktop and 320/390 px widths. It checks title containment, clipped-only display, light/dark colors, hover persistence, keyboard dismissal, resize, safe text, render cleanup, and removal of both success banners. No private feed is used. Run against an already opened target with `playwright-cli --session <session> run-code --filename scripts/event-title-check.js`; the existing Playwright CLI supplies the browser, without adding a frontend package install or build step to the app.
+- Release verification is tracked in [deployment.md](deployment.md).
 
 ## Follow-up investigation, September 27, 2026
 

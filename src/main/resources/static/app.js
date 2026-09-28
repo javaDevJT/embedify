@@ -32,6 +32,80 @@
   let eventLinkSequence = 0;
   if (!calendarRoot || !config) return;
 
+  const eventTooltip = node("div", "event-tooltip");
+  eventTooltip.id = "event-title-tooltip";
+  eventTooltip.setAttribute("role", "tooltip");
+  eventTooltip.setAttribute("popover", "manual");
+  let tooltipAnchor = null;
+  let dismissedTooltipAnchor = null;
+  let tooltipHideTimer = 0;
+
+  function hideEventTooltip() {
+    clearTimeout(tooltipHideTimer);
+    tooltipAnchor?.removeAttribute("aria-describedby");
+    tooltipAnchor = null;
+    if (eventTooltip.matches(":popover-open")) eventTooltip.hidePopover();
+  }
+
+  function positionEventTooltip() {
+    if (!tooltipAnchor) return;
+    const rect = tooltipAnchor.getBoundingClientRect();
+    const width = document.documentElement.clientWidth;
+    const height = window.innerHeight;
+    if (!tooltipAnchor.isConnected || rect.bottom < 0 || rect.top > height || rect.right < 0 || rect.left > width
+        || tooltipAnchor.scrollWidth <= tooltipAnchor.clientWidth) {
+      hideEventTooltip();
+      return;
+    }
+    const left = Math.max(8, Math.min(rect.left, width - eventTooltip.offsetWidth - 8));
+    const below = rect.bottom + 6;
+    const top = below + eventTooltip.offsetHeight <= height - 8
+      ? below : rect.top - eventTooltip.offsetHeight - 6;
+    eventTooltip.style.left = `${left}px`;
+    eventTooltip.style.top = `${Math.max(8, Math.min(top, height - eventTooltip.offsetHeight - 8))}px`;
+  }
+
+  function showEventTooltip(label) {
+    hideEventTooltip();
+    dismissedTooltipAnchor = null;
+    if (label.scrollWidth <= label.clientWidth) return;
+    tooltipAnchor = label;
+    eventTooltip.textContent = label.textContent;
+    label.setAttribute("aria-describedby", eventTooltip.id);
+    eventTooltip.showPopover();
+    positionEventTooltip();
+  }
+
+  function scheduleTooltipHide() {
+    clearTimeout(tooltipHideTimer);
+    tooltipHideTimer = setTimeout(() => {
+      if (!tooltipAnchor?.matches(":hover, :focus") && !eventTooltip.matches(":hover")) hideEventTooltip();
+    }, 150);
+  }
+
+  function updateEventTitleAccess() {
+    calendarRoot.querySelectorAll("span.event-chip").forEach(label => {
+      if (label.scrollWidth > label.clientWidth) label.tabIndex = 0;
+      else label.removeAttribute("tabindex");
+    });
+    const activeLabel = calendarRoot.querySelector(".event-chip:focus") || calendarRoot.querySelector(".event-chip:hover");
+    if (!tooltipAnchor && activeLabel && activeLabel !== dismissedTooltipAnchor
+        && activeLabel.scrollWidth > activeLabel.clientWidth) showEventTooltip(activeLabel);
+    positionEventTooltip();
+  }
+
+  eventTooltip.addEventListener("pointerenter", () => clearTimeout(tooltipHideTimer));
+  eventTooltip.addEventListener("pointerleave", scheduleTooltipHide);
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+      dismissedTooltipAnchor = tooltipAnchor;
+      hideEventTooltip();
+    }
+  });
+  window.addEventListener("scroll", positionEventTooltip, true);
+  window.addEventListener("resize", updateEventTitleAccess);
+  new ResizeObserver(updateEventTitleAccess).observe(calendarRoot);
+
   function node(tag, className, text) {
     const item = document.createElement(tag);
     if (className) item.className = className;
@@ -275,7 +349,7 @@
     } else if (!state.feeds.length) {
       setMessage(notice, "Sample demo · connect at least one public feed to see your actual events.", "");
     } else if (state.loaded) {
-      setMessage(notice, "Public feed loaded · refreshes at most once a minute while this page is visible.", "live");
+      setMessage(notice, "", "");
     } else {
       setMessage(notice, "Live feed preview · loading source calendar.", "");
     }
@@ -547,10 +621,14 @@
       const list = node("ol", "day-events");
       dayEvents.slice(0, 3).forEach(event => {
         const item = node("li");
-        const title = cleanText(event.title, 100) || "Untitled event";
+        const title = cleanText(event.title, 256) || "Untitled event";
         appendEventTitle(item, event, title, "event-chip");
         const linked = item.firstElementChild;
-        linked.title = title;
+        if (linked.tagName === "SPAN") linked.setAttribute("role", "group");
+        linked.addEventListener("pointerenter", () => showEventTooltip(linked));
+        linked.addEventListener("pointerleave", scheduleTooltipHide);
+        linked.addEventListener("focus", () => showEventTooltip(linked));
+        linked.addEventListener("blur", scheduleTooltipHide);
         linked.setAttribute("aria-label", `${title}, ${eventTimeLabel(event, timezone)}, ${eventRangeLabel(event, timezone)}`);
         list.appendChild(item);
       });
@@ -583,7 +661,7 @@
       item.appendChild(date);
       const body = node("div", "agenda-content");
       const title = node("h3");
-      appendEventTitle(title, event, cleanText(event.title, 140) || "Untitled event", "agenda-title");
+      appendEventTitle(title, event, cleanText(event.title, 256) || "Untitled event", "agenda-title");
       body.appendChild(title);
       const details = [eventTimeLabel(event, timezone), cleanText(event.location, 150)].filter(Boolean);
       if (event.allDay) details[0] = "All day";
@@ -599,6 +677,7 @@
 
   function renderCalendar() {
     if (!calendarRoot) return;
+    hideEventTooltip();
     const active = calendarRoot.contains(document.activeElement) ? {
       id: document.activeElement.id,
       focusKey: document.activeElement.dataset.focusKey
@@ -669,8 +748,9 @@
     }
 
     if (state.truncated) inner.appendChild(node("p", "truncated-note", "This calendar has more events than can be shown at once. Check the feed source for the complete schedule."));
-    card.appendChild(inner);
+    card.append(inner, eventTooltip);
     calendarRoot.replaceChildren(card);
+    updateEventTitleAccess();
     if (active) {
       const target = (active.id && document.getElementById(active.id)) || (active.focusKey && Array.from(calendarRoot.querySelectorAll("[data-focus-key]")).find(item => item.dataset.focusKey === active.focusKey));
       if (target) target.focus({ preventScroll: true });
