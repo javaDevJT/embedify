@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 
 const require = createRequire(import.meta.url);
-const { parseOptions, safeHttpsUrl, safeTitle, validTimezone } = require("../src/main/resources/static/config.js");
+const { parseOptions, safeHttpsUrl, safeFeedUrl, safeTitle, validTimezone } = require("../src/main/resources/static/config.js");
 const builderHtml = readFileSync(new URL("../src/main/resources/static/index.html", import.meta.url), "utf8");
 const embedHtml = readFileSync(new URL("../src/main/resources/static/embed.html", import.meta.url), "utf8");
 const faviconSvg = readFileSync(new URL("../src/main/resources/static/favicon.svg", import.meta.url), "utf8");
@@ -13,6 +13,14 @@ assert.equal(safeHttpsUrl("https://example.org/calendar.ics?key=visible"), "http
 assert.equal(safeHttpsUrl("http://example.org/calendar.ics"), null);
 assert.equal(safeHttpsUrl("https://user:pass@example.org/calendar.ics"), null);
 assert.equal(safeHttpsUrl("https://example.org:8443/calendar.ics"), null);
+
+assert.equal(safeFeedUrl(" WEBCAL://example.org/calendar.ics?key=visible "), "https://example.org/calendar.ics?key=visible");
+assert.equal(safeFeedUrl("https://example.org/calendar.ics"), "https://example.org/calendar.ics");
+for (const value of ["http://example.org/calendar.ics", "webcal://user:pass@example.org/calendar.ics", "webcal://example.org:8443/calendar.ics", "webcal:not-a-url"]) {
+  assert.equal(safeFeedUrl(value), null);
+}
+assert.equal(safeHttpsUrl("webcal://example.org/calendar.ics"), null);
+assert.deepEqual(parseOptions(new URLSearchParams({ feed: "webcal://example.org/calendar.ics" })).feeds, ["https://example.org/calendar.ics"]);
 
 const options = parseOptions("?feed=https%3A%2F%2Fexample.org%2Fone.ics&feed=http%3A%2F%2Finvalid.test%2Ffeed&feed=https%3A%2F%2Fexample.net%2Ftwo.ics&title=Shared%20dates&tz=UTC&weekStart=mon&background=%23fafafa&surface=%23ffffff&text=%23000000&accent=%23cc4422&font=mono&size=large&radius=round&density=airy&view=agenda&month=2026-10");
 assert.deepEqual(options.feeds, ["https://example.org/one.ics", "https://example.net/two.ics"]);

@@ -18,6 +18,10 @@
     }
   }
 
+  function safeFeedUrl(value) {
+    return safeHttpsUrl(String(value).trim().replace(/^webcal:\/\//i, "https://"));
+  }
+
   function validTimezone(value) {
     const candidate = String(value || "").trim();
     try {
@@ -52,7 +56,7 @@
       ? search
       : new URLSearchParams(String(search || "").replace(/^\?/, ""));
     const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Detroit";
-    const feeds = query.getAll("feed").map(safeHttpsUrl).filter(Boolean).slice(0, 5);
+    const feeds = query.getAll("feed").map(safeFeedUrl).filter(Boolean).slice(0, 5);
     const background = query.get("background");
     const surface = query.get("surface");
     const text = query.get("text");
@@ -75,7 +79,7 @@
     };
   }
 
-  const api = { safeHttpsUrl, validTimezone, safeTitle, parseOptions };
+  const api = { safeHttpsUrl, safeFeedUrl, validTimezone, safeTitle, parseOptions };
   root.EmbedifyConfig = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

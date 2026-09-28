@@ -220,7 +220,7 @@
 
   function currentOptions() {
     const feeds = Array.from(document.querySelectorAll(".feed-url"))
-      .map(input => config.safeHttpsUrl(input.value))
+      .map(input => config.safeFeedUrl(input.value))
       .filter(Boolean);
     const titleInput = document.getElementById("calendar-title");
     const timezoneInput = document.getElementById("timezone");
@@ -255,7 +255,7 @@
     const bad = [];
     fields.forEach((input, index) => {
       const value = input.value.trim();
-      const invalid = value && !config.safeHttpsUrl(value);
+      const invalid = value && !config.safeFeedUrl(value);
       input.setCustomValidity(invalid ? "Enter a public HTTPS URL without credentials." : "");
       if (invalid) bad.push(index + 1);
     });
