@@ -2,7 +2,7 @@
 
 Audit date: September 28, 2026. Application/worktree snapshot: `0416eff`. The temporary remote mirror also includes main revision `6cff659`; its only change is two GitHub Actions build-cache settings, which were reviewed and do not resolve the findings below. The worktree was not reset or updated to that revision.
 
-Remediation status: both requested source changes are implemented and local checks pass; CI/image/deployment verification is pending. The repository remains private. A future publication still requires checking public-repository fork approvals and branch protections in the intended state.
+Remediation status: both requested fixes are committed, passed CI, and are deployed. The repository and GHCR package remain private. A future publication still requires checking public-repository fork approvals and branch protections in their intended state.
 
 The original audit found no confirmed application exploit or real credential leak in the completed checks. Public visibility itself does not introduce the dependency issues; the hosted application is already public.
 
@@ -16,6 +16,15 @@ Repository and GHCR package visibility remain private. The initial audit changed
 - The live private-repository settings were read back: fork-PR workflows disabled, write tokens disabled, and secrets/variables disabled. Public contributor approval is still unavailable while private. Public visibility must not be enabled until the public policy can be safely configured and verified; keep Actions disabled during that transition if necessary. No shared runner architecture was changed.
 - Local `mvn -B -ntp verify` passed **34 tests**. CI policy and existing UI checks passed. The rebuilt package contains Jackson Databind 3.1.7 and Tomcat 11.0.26; **44 runtime libraries** were queried against OSV with no matches and no unresolved package coordinates. This does not replace the separate OS/JDK scan that was outside the audit scope.
 - `/root/fork_guard_review` approved the implemented guard and regression check. Same-repository branch writers remain trusted to execute CI; the regression script is not an independent authorization boundary. Requested configuration was `gpt-6-luna` / `max` from the current single-Luna native catalog, with backend fields and priority unexposed. Findings accepted; native completion released the worker. Primary owns implementation and release.
+
+## Verified release — September 28, 2026
+
+- Application commit: `19f4b12ff3489c9f32ac3b68cdc0d530e229fe29`. GitHub Actions run `36494103220` passed both verification and private image publication.
+- Published and deployed image: `ghcr.io/javadevjt/embedify@sha256:c9b0adb5c2328fe6c743294bd255b8f311529c91bc1d07c75bf6841141ebb9db`, resolved from the exact application commit tag.
+- The scoped TrueNAS image update completed as job `212316`; saved configuration equality confirmed that only the image changed. A subsequent inspection reported Embedify `RUNNING` on that digest.
+- LAN and public health checks returned HTTP 200. The public builder, embed, and license also returned HTTP 200; served `app.css`, `app.js`, and `config.js` matched the committed source byte for byte.
+- The live synthetic-feed browser regression passed cell bounds, overflow-only tooltips, palette matching, keyboard behavior, resize, narrow iframe bounds, cleanup, and the hidden success banner. No private feed was requested.
+- Repository and GHCR visibility were read back as private. The original working tree was preserved because macOS cloud-placeholder Git objects still prevent a reliable status/fetch; release work used a fully local checkout.
 
 ## Scope and evidence
 

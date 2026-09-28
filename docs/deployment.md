@@ -93,3 +93,13 @@ Feed pulls share a bounded 60-second cache and coalesce concurrent misses. Parse
 Style suggestions sample up to 1 MiB from a public page and up to three linked public CSS files (64 KiB each), including CDN stylesheets. Inline CSS samples and pasted CSS are bounded. Fetches retain public-address checks and time limits; scripts, CSS imports, and fonts are not fetched. Suggestions extract literal colors and a local font category without executing CSS. File uploads, credentials, private-network URLs, and non-HTTPS feed requests are rejected. Public embeds expose their feed URLs, so never use secret calendar links.
 
 Cloudflare may reject generic automation user agents; ordinary browser access and the public user flows above were verified. This does not require weakening the app's content security policy.
+
+## Public-readiness hardening release — September 28, 2026
+
+Application commit `19f4b12ff3489c9f32ac3b68cdc0d530e229fe29` blocks external-fork PR jobs before TrueNAS runner allocation, limits manual verification/publication to `main`, and updates Jackson to 3.1.7 and Tomcat to 11.0.26.
+
+GitHub Actions run `36494103220` passed verification and private image publication. The deployed image is `ghcr.io/javadevjt/embedify@sha256:c9b0adb5c2328fe6c743294bd255b8f311529c91bc1d07c75bf6841141ebb9db`. TrueNAS job `212316` changed only the image; a subsequent inspection confirmed `RUNNING` on that digest.
+
+LAN/public health, builder, embed, and license returned HTTP 200. All three served JavaScript/CSS assets matched the release source. The existing synthetic-feed browser regression passed, including tooltip palettes, keyboard behavior, narrow iframe bounds, and the removed success banner. Repository and GHCR package remain private.
+
+The previous runtime digest was `sha256:f3ef2a29f92f8f456a346e95447e18b2b60ac057dcdecdba2a2eec51fe54bdd8`; rolling back would restore the older dependencies. See [the readiness audit](public-readiness-audit.md) for dependency-scan evidence and remaining checks before changing repository visibility.
