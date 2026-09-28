@@ -1,0 +1,58 @@
+name: Memory-backed image and cache proof
+on:
+  push:
+    branches: [codex/truenas-memory-cache-20260928]
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Full image build (${{ matrix.pass }})
+    runs-on: truenas-embedify
+    timeout-minutes: 30
+    strategy:
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        pass: [cold, warm]
+    steps:
+      - name: Check out the real application
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify isolated runner permissions
+        run: |
+          set -eu
+          test "$(id -u)" = 1001
+          test "$(awk '/^CapEff:/ {print $2}' /proc/self/status)" = 0000000000000000
+          test "$(awk '/^NoNewPrivs:/ {print $2}' /proc/self/status)" = 1
+          test ! -S /var/run/docker.sock
+          test ! -S /run/docker/docker.sock
+          test ! -e /tmp/private/github-app.json
+          test "$(stat -c %a "$BUILDKIT_TLS_CLIENT_KEY")" = 600
+          echo "Fresh worker: $RUNNER_NAME"
+      - name: Use the isolated RAM-backed builder
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+        with:
+          driver: remote
+          endpoint: tcp://buildkit:1234
+          driver-opts: |
+            cacert=/run/buildkit/tls/ca.pem
+            cert=/run/buildkit/tls/client.pem
+            key=/run/buildkit/tls/client.key
+      - name: Verify build execution uses the 16 GiB RAM filesystem
+        run: |
+          set -eu
+          mkdir "$RUNNER_TEMP/memory-proof"
+          cat > "$RUNNER_TEMP/memory-proof/Dockerfile" <<'DOCKERFILE'
+          FROM alpine:3.22
+          RUN test "$(stat -f -c %T /)" = tmpfs && test "$(df -Pk / | tail -1 | awk '{print $2}')" = 16777216 && echo 'VERIFIED: build execution uses 16 GiB tmpfs'
+          DOCKERFILE
+          docker buildx build --no-cache --progress=plain "$RUNNER_TEMP/memory-proof"
+      - name: Build full application and exchange external cache
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,version=2,scope=memory-proof-${{ github.run_id }}
+          cache-to: type=gha,version=2,mode=max,scope=memory-proof-${{ github.run_id }}
+      - name: Hold for mount and cleanup attribution
+        run: sleep 30
