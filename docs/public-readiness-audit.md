@@ -2,18 +2,28 @@
 
 Audit date: September 28, 2026. Application/worktree snapshot: `0416eff`. The temporary remote mirror also includes main revision `6cff659`; its only change is two GitHub Actions build-cache settings, which were reviewed and do not resolve the findings below. The worktree was not reset or updated to that revision.
 
-Remediation status: both requested fixes are committed, passed CI, and are deployed. The repository and GHCR package remain private. A future publication still requires checking public-repository fork approvals and branch protections in their intended state.
+Publication status: the owner authorized publication on September 28, 2026. The repository is public, its public-state protections are verified, and the GHCR package remains private. The earlier hardening release is deployed; verification of a fresh build under the public settings is pending.
 
 The original audit found no confirmed application exploit or real credential leak in the completed checks. Public visibility itself does not introduce the dependency issues; the hosted application is already public.
 
-Repository and GHCR package visibility remain private. The initial audit changed documentation only. The owner subsequently authorized the two recommended remediations; their verification is recorded below. No publication, history rewrite, or live attack is authorized by this work.
+The initial audit changed documentation only. The owner subsequently authorized both recommended remediations and then repository publication. The verified settings and release evidence are recorded below. This work does not authorize a history rewrite or live attack.
+
+## Public settings verified — September 28, 2026
+
+- Actions were paused before changing visibility. After public protections were configured and read back, Actions were re-enabled with full commit-SHA pinning required and an allowlist limited to the five action repositories already used by CI.
+- Fork workflow approval is `all_external_contributors`. The existing `pull_request_target` workflow separately rejects external head repositories before allocating TrueNAS runners. Approval policy alone is not that workflow's trust boundary.
+- `main` requires one approving PR review, dismisses stale reviews, requires conversations to be resolved, and requires the up-to-date `Build and test` check from GitHub Actions app ID `15368`. Force pushes and branch deletion are disabled. The sole repository writer is the owner, whose administrator bypass remains available for owner-authored releases.
+- External-fork jobs are intentionally skipped. A successful skipped check is not evidence that fork code was tested; a maintainer must inspect changes and deliberately choose a safe testing path before merging.
+- Default workflow tokens remain read-only, and Actions cannot approve pull requests. Package-write permission remains limited to the publishing job.
+- Private vulnerability reporting, dependency alerts, secret scanning, and secret-scanning push protection are enabled. [SECURITY.md](../SECURITY.md) documents the private reporting route.
+- The repository is public; the GHCR package remains private. The hosted-use license and deployment restrictions are unchanged.
 
 ## Authorized remediation
 
 - Spring Boot 4.1.1 remained the newest published 4.1 maintenance release when Maven Central was checked on September 28. Its managed Jackson/Tomcat versions still matched the findings, so `pom.xml` now explicitly overrides the Jackson BOM to **3.1.7** and Tomcat to **11.0.26**, retaining the existing framework release. Remove the overrides when Spring Boot manages these fixes.
 - The workflow now uses `pull_request_target`, so the job guard comes from the trusted base workflow. A job-level guard excludes every different head repository before allocating the TrueNAS runner. Allowed same-repository PRs explicitly check out their head SHA with checkout credential persistence disabled. Manual verification and publication require `main`; PR events never publish.
 - `scripts/ci-policy-check.mjs` reads the actual workflow guards and checks external forks, same-owner forks, same-repository PRs, main pushes/manual runs, and non-main manual runs. It also rejects a return to the PR-controlled `pull_request` trigger. This protects the committed workflow; it is not a claim that repository YAML can prevent every newly introduced workflow.
-- The live private-repository settings were read back: fork-PR workflows disabled, write tokens disabled, and secrets/variables disabled. Public contributor approval is still unavailable while private. Public visibility must not be enabled until the public policy can be safely configured and verified; keep Actions disabled during that transition if necessary. No shared runner architecture was changed.
+- Before publication, the private-repository settings disabled fork-PR workflows, write tokens, and secrets/variables. Public protections became configurable after visibility changed, with Actions disabled during that transition. The current verified public settings are listed above. No shared runner architecture was changed.
 - Local `mvn -B -ntp verify` passed **34 tests**. CI policy and existing UI checks passed. The rebuilt package contains Jackson Databind 3.1.7 and Tomcat 11.0.26; **44 runtime libraries** were queried against OSV with no matches and no unresolved package coordinates. This does not replace the separate OS/JDK scan that was outside the audit scope.
 - `/root/fork_guard_review` approved the implemented guard and regression check. Same-repository branch writers remain trusted to execute CI; the regression script is not an independent authorization boundary. Requested configuration was `gpt-6-luna` / `max` from the current single-Luna native catalog, with backend fields and priority unexposed. Findings accepted; native completion released the worker. Primary owns implementation and release.
 

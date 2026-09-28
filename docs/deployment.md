@@ -1,6 +1,6 @@
 # Deployment
 
-Embedify is live at https://embedify.javadevjt.tech. The repository `javaDevJT/embedify` and GHCR package remain **private** until the owner explicitly approves publication.
+Embedify is live at https://embedify.javadevjt.tech. The repository `javaDevJT/embedify` is public with the owner's approval; the GHCR package remains **private**. Public-repository protections are recorded in the [readiness audit](public-readiness-audit.md).
 
 ## Event titles and success-banner removal — September 28, 2026
 
