@@ -2,6 +2,14 @@
 
 Embedify is live at https://embedify.javadevjt.tech. The repository `javaDevJT/embedify` is public with the owner's approval; the GHCR package remains **private**. Public-repository protections are recorded in the [readiness audit](public-readiness-audit.md).
 
+## Public repository release verified — September 28, 2026
+
+- Release commit `38974d3089623fa5114c72625cd3620f1beef572` passed GitHub Actions run `36496999156` after public-repository protections were enabled. The verification and private image-publishing jobs both succeeded.
+- Deployed image: `ghcr.io/javadevjt/embedify@sha256:1526d6a67d1d3bf481f517b7beb0a15dc33ca8e069688a0e88070b74f0c3ad3e`. TrueNAS job `212377` changed only the image; a subsequent inspection confirmed `RUNNING` on that digest. The ignored local image pin matches it.
+- LAN/public health, builder, embed, and license returned HTTP 200; served JavaScript/CSS matched source. The synthetic-feed browser regression passed, including themed tooltips, keyboard behavior, narrow iframe bounds, and the hidden success banner.
+- Anonymous GitHub access confirms the repository is public. The GHCR image remains private. Actions, branch protections, private vulnerability reporting, secret scanning, and dependency alerts were verified as recorded in the audit.
+- Previous runtime digest: `sha256:c9b0adb5c2328fe6c743294bd255b8f311529c91bc1d07c75bf6841141ebb9db`.
+
 ## Event titles and success-banner removal — September 28, 2026
 
 - Application source: `e7de34a77f448543120101f104c52c153abf6daf`. GitHub Actions run `36464831635` passed 34 backend tests and the existing URL checks. The synthetic browser regression passed locally for clipping, full-title tooltips, palette inheritance, hover/focus/Escape, resizing, narrow iframe bounds, and removal of the loaded-feed banner in builder and embed.

@@ -2,7 +2,7 @@
 
 Audit date: September 28, 2026. Application/worktree snapshot: `0416eff`. The temporary remote mirror also includes main revision `6cff659`; its only change is two GitHub Actions build-cache settings, which were reviewed and do not resolve the findings below. The worktree was not reset or updated to that revision.
 
-Publication status: the owner authorized publication on September 28, 2026. The repository is public, its public-state protections are verified, and the GHCR package remains private. The earlier hardening release is deployed; verification of a fresh build under the public settings is pending.
+Publication status: the owner authorized publication on September 28, 2026. The repository is public, its public-state protections are verified, and the GHCR package remains private. A fresh build passed CI under those settings and is deployed with successful live checks.
 
 The original audit found no confirmed application exploit or real credential leak in the completed checks. Public visibility itself does not introduce the dependency issues; the hosted application is already public.
 
@@ -12,11 +12,19 @@ The initial audit changed documentation only. The owner subsequently authorized 
 
 - Actions were paused before changing visibility. After public protections were configured and read back, Actions were re-enabled with full commit-SHA pinning required and an allowlist limited to the five action repositories already used by CI.
 - Fork workflow approval is `all_external_contributors`. The existing `pull_request_target` workflow separately rejects external head repositories before allocating TrueNAS runners. Approval policy alone is not that workflow's trust boundary.
-- `main` requires one approving PR review, dismisses stale reviews, requires conversations to be resolved, and requires the up-to-date `Build and test` check from GitHub Actions app ID `15368`. Force pushes and branch deletion are disabled. The sole repository writer is the owner, whose administrator bypass remains available for owner-authored releases.
+- `main` requires one approving PR review, dismisses stale reviews, requires conversations to be resolved, and requires the up-to-date `Build and test` check from GitHub Actions app ID `15368`. Force pushes and branch deletion are disabled. The only listed human collaborator is the owner, whose administrator bypass remains available for owner-authored releases.
+- Pre-existing repository ruleset `24134307` also restricts branch creation/updates, requires linear history and signed commits, and requires PR review. It was preserved unchanged, including its existing administrator and Integration `5102173` bypasses. The integration's display name was not exposed by the available API lookups; this review did not grant it new access. Owner-authorized release pushes used the existing bypass.
 - External-fork jobs are intentionally skipped. A successful skipped check is not evidence that fork code was tested; a maintainer must inspect changes and deliberately choose a safe testing path before merging.
 - Default workflow tokens remain read-only, and Actions cannot approve pull requests. Package-write permission remains limited to the publishing job.
 - Private vulnerability reporting, dependency alerts, secret scanning, and secret-scanning push protection are enabled. [SECURITY.md](../SECURITY.md) documents the private reporting route.
 - The repository is public; the GHCR package remains private. The hosted-use license and deployment restrictions are unchanged.
+
+## Public release verified — September 28, 2026
+
+- Release commit `38974d3089623fa5114c72625cd3620f1beef572` passed verification and private image publication in GitHub Actions run `36496999156`, with the public repository settings active.
+- Published and deployed image: `ghcr.io/javadevjt/embedify@sha256:1526d6a67d1d3bf481f517b7beb0a15dc33ca8e069688a0e88070b74f0c3ad3e`. TrueNAS image-only update job `212377` succeeded, preserved the remaining live configuration, and was followed by a `RUNNING` inspection on the same digest.
+- LAN/public health, builder, embed, and license returned HTTP 200. Served JavaScript/CSS matched source bytes. The live synthetic-feed browser check passed cell bounds, overflow-only tooltips, palette matching, keyboard/resize behavior, narrow iframe bounds, cleanup, and hidden success banners.
+- An unauthenticated GitHub API request returned HTTP 200 with `visibility: public` and `private: false`. GHCR remains private. The local ignored image pin was updated to the deployed digest.
 
 ## Authorized remediation
 
@@ -77,7 +85,7 @@ Actions history: **18 runs inventoried; logs from 16 runs scanned (1,722,276 cha
 
 These were custom bounded signature checks, not gitleaks/trufflehog or a guarantee against every secret format. Deleted/unreachable server-side Git objects and records no longer returned by GitHub were outside scope. A known previously exposed credential must still be rotated regardless of scan results.
 
-## Other findings and hardening
+## Other findings and hardening (original audit)
 
 - **Low — manual publishing accepts any authorized dispatch ref.** `ci.yml:36` allows `workflow_dispatch` without checking `main`. Only a write-authorized dispatcher can use this; it is not a public-fork privilege bypass. Restrict publication to `main` if that is the intended release policy, or document deliberate branch builds.
 - **Low — no HSTS header on the checked public responses.** The builder, embed, license, and health routes returned HTTPS 200, but no `Strict-Transport-Security` header. Consider enabling it at the public proxy. This observation does not establish the absence of any parent-domain/preload protection.
