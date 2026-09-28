@@ -28,6 +28,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CalendarFeedServiceTest {
  private final CalendarFeedService service = new CalendarFeedService(null);
 
+    @Test
+    void readsFoldedEventSummariesWithLfOrCrLfLineEndings() {
+        StringBuilder source = new StringBuilder("BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Embedify//Test//EN\n");
+        for (int index = 0; index < 16; index++) {
+            source.append("BEGIN:VEVENT\nUID:shift-").append(index).append("\n")
+                    .append("DTSTART;VALUE=DATE-TIME:20260928T120000Z\n")
+                    .append("DTEND;VALUE=DATE-TIME:20260928T130000Z\n")
+                    .append("SUMMARY:On-call rotation for the\n  operations team\nEND:VEVENT\n");
+        }
+        source.append("END:VCALENDAR\n");
+
+        for (String newline : List.of("\n", "\r\n")) {
+            var result = service.parseFeed(source.toString().replace("\n", newline),
+                    LocalDate.parse("2026-09-28"), LocalDate.parse("2026-09-29"),
+                    ZoneId.of("UTC"), 0, 500);
+            assertEquals(16, result.events().size());
+            assertTrue(result.events().stream()
+                    .allMatch(event -> event.title().equals("On-call rotation for the operations team")));
+            assertFalse(result.truncated());
+        }
+    }
+
  @Test
  void disablesIcal4jTimezoneUpdatesFromClasspathConfiguration() {
  assertEquals("false", Configurator.getProperty("net.fortuna.ical4j.timezone.update.enabled").orElseThrow());

@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import net.fortuna.ical4j.data.CalendarBuilder;
 import net.fortuna.ical4j.data.ParserException;
+import net.fortuna.ical4j.data.UnfoldingReader;
 import net.fortuna.ical4j.model.Component;
 import net.fortuna.ical4j.model.Dur;
 import net.fortuna.ical4j.model.Period;
@@ -158,7 +159,7 @@ public class CalendarFeedService {
         validateSourceShape(content);
         net.fortuna.ical4j.model.Calendar calendar;
         try {
-            calendar = new CalendarBuilder().build(new StringReader(content));
+            calendar = new CalendarBuilder().build(new UnfoldingReader(new StringReader(content), true));
         } catch (IOException | ParserException | RuntimeException exception) {
             throw upstreamFailure();
         }
