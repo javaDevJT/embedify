@@ -83,6 +83,17 @@ async (page) => {
     await tooltip.waitFor({ state: "visible" });
     await page.locator("#calendar-next").click();
     await closed();
+    await page.setViewportSize({ width: 960, height: 700 });
+    await page.setContent('<iframe id="tooltip-test-frame" title="Calendar tooltip test" width="320" height="240"></iframe>');
+    await page.locator("#tooltip-test-frame").evaluate((element, url) => { element.src = url; }, `${origin}/embed?${query()}`);
+    const frame = page.frameLocator("#tooltip-test-frame");
+    await frame.locator("a.event-chip").first().hover();
+    const framedTooltip = frame.locator("#event-title-tooltip");
+    await framedTooltip.waitFor({ state: "visible" });
+    check(await framedTooltip.evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      return rect.left >= 0 && rect.top >= 0 && rect.right <= document.documentElement.clientWidth && rect.bottom <= innerHeight;
+    }), "Tooltip escaped the small iframe viewport");
     params.surface = "#ffffff";
     params.text = "#172b4d";
     params.accent = "#0053db";
@@ -99,7 +110,7 @@ async (page) => {
     await page.locator("#calendar-view-agenda").click();
     check(await page.locator(".agenda-title").filter({ hasText: plainTitle }).count() === 1, "Agenda lost the full event title");
     check(errors.length === 0, `Browser errors: ${errors.join("; ")}`);
-    return { passed: true, checks: "cell bounds, overflow-only tooltips, palettes, keyboard, resize, cleanup, and hidden success banner" };
+    return { passed: true, checks: "cell bounds, overflow-only tooltips, palettes, keyboard, resize, iframe bounds, cleanup, and hidden success banner" };
   } finally {
     await page.goto(origin);
     await page.unroute(route, respond);

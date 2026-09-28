@@ -2,6 +2,13 @@
 
 Embedify is live at https://embedify.javadevjt.tech. The repository `javaDevJT/embedify` and GHCR package remain **private** until the owner explicitly approves publication.
 
+## Event titles and success-banner removal — September 28, 2026
+
+- Application source: `e7de34a77f448543120101f104c52c153abf6daf`. GitHub Actions run `36464831635` passed 34 backend tests and the existing URL checks. The synthetic browser regression passed locally for clipping, full-title tooltips, palette inheritance, hover/focus/Escape, resizing, narrow iframe bounds, and removal of the loaded-feed banner in builder and embed.
+- Image publication attempts 1 and 2 lost communication with runners `truenas-embedify-87bfc872` and `truenas-embedify-6822fed1`. Both GitHub annotations report a runner connection failure, without an application-test failure. Attempt 3 succeeded at 19:24:37 UTC and published the source-matched image. A later retry request was unnecessary because the run had already succeeded.
+- The scoped image-only TrueNAS update succeeded and verified the saved configuration. Production is RUNNING on `ghcr.io/javadevjt/embedify@sha256:f3ef2a29f92f8f456a346e95447e18b2b60ac057dcdecdba2a2eec51fe54bdd8`, tagged for `e7de34a`. Both LAN and public health endpoints returned HTTP 200. Served builder/embed HTML, JavaScript, and CSS matched the source bytes.
+- The synthetic browser regression passed against the public deployment, including cell bounds, overflow-only tooltips, palette inheritance, keyboard/Escape, resize, a 320 × 240 iframe, rerender cleanup, and hidden success banners. No private calendar feed was used. The existing coffee and attribution links remain unchanged.
+
 ## Webcal and folded-feed fixes — September 28, 2026
 
 - Application source: `a44061f294348f9803460df22307d57fc72dadd7`, including the earlier frontend fix `0781d16484110e202a707d70a7879f0aa1a798f8`. Successful GitHub Actions run `36455139040` passed 34 backend tests and the builder/embed URL checks, then published the private image.
