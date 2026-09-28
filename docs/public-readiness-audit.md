@@ -24,7 +24,7 @@ Repository and GHCR package visibility remain private. The initial audit changed
 - The scoped TrueNAS image update completed as job `212316`; saved configuration equality confirmed that only the image changed. A subsequent inspection reported Embedify `RUNNING` on that digest.
 - LAN and public health checks returned HTTP 200. The public builder, embed, and license also returned HTTP 200; served `app.css`, `app.js`, and `config.js` matched the committed source byte for byte.
 - The live synthetic-feed browser regression passed cell bounds, overflow-only tooltips, palette matching, keyboard behavior, resize, narrow iframe bounds, cleanup, and the hidden success banner. No private feed was requested.
-- Repository and GHCR visibility were read back as private. The original working tree was preserved because macOS cloud-placeholder Git objects still prevent a reliable status/fetch; release work used a fully local checkout.
+- Repository and GHCR visibility were read back as private. The original checkout was later synchronized to this release after its cloud-backed files became readable; its prior audit edits are preserved in a named Git stash.
 
 ## Scope and evidence
 
