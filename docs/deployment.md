@@ -2,6 +2,14 @@
 
 Embedify is live at https://embedify.javadevjt.tech. The repository `javaDevJT/embedify` and GHCR package remain **private** until the owner explicitly approves publication.
 
+## Webcal URL fix — September 28, 2026 (deployment pending)
+
+- Application source: `0781d16484110e202a707d70a7879f0aa1a798f8`; GitHub Actions run `36446616507` passed all 33 backend tests and the builder/embed UI checks. Image publication was still running at the last check; no image from this release has been deployed.
+- The backend already normalized `webcal://` to HTTPS, but frontend validation rejected it before fetching. Feed inputs and embed query parameters now share calendar-specific normalization. Event links and stylesheet URLs retain their strict HTTPS validation.
+- Regression checks cover mixed-case schemes, generated HTTPS URLs, credentials, non-443 ports, malformed URLs, and direct embed parameters. A local browser loaded the existing public CalendarLabs sample through a `webcal://` input, confirmed input validity, and generated an HTTPS embed URL. The reported private feed was not fetched or added to test fixtures.
+- The remote change to transient TrueNAS CI workers was preserved. The publication job reached the build-and-attest step; its live log download returned HTTP 404, so a slow build versus a stall remains unconfirmed.
+- Production was last verified RUNNING on `ghcr.io/javadevjt/embedify@sha256:2b940ebd8472015475cdffb929ec4613382d7bc4be5bf40b2ad7495a9f9dacb0`. Complete the usual image-only deployment and public builder/embed checks after successful publication. Until then, replacing a feed's `webcal://` prefix with `https://` bypasses the frontend validation bug without verifying the upstream feed itself.
+
 ## Hosted-use license release — September 27, 2026
 
 - Application source: `e4bd24e3e1e9fd89dc560347bbbe62b1c4fe60d3`; successful GitHub Actions run `36347867057` passed 33 backend tests and UI checks and published the private image.
