@@ -4,7 +4,12 @@
   <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>4.1.1</version><relativePath/></parent>
   <groupId>tech.javadevjt</groupId><artifactId>embedify</artifactId><version>0.1.0</version>
   <name>Embedify</name><description>Lightweight, customizable calendar feed embeds</description>
-  <properties><java.version>25</java.version></properties>
+  <properties>
+    <java.version>25</java.version>
+    <!-- Remove these overrides when Spring Boot manages these security fixes. -->
+    <jackson-bom.version>3.1.7</jackson-bom.version>
+    <tomcat.version>11.0.26</tomcat.version>
+  </properties>
   <dependencies>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc</artifactId></dependency>
     <dependency><groupId>com.github.ben-manes.caffeine</groupId><artifactId>caffeine</artifactId></dependency>

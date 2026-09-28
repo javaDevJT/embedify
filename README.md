@@ -4,6 +4,7 @@ Calendar feeds, made to fit your website. A single Spring Boot 4 service serves 
 
 - [Design, API, and work record](docs/design.md)
 - [Deployment and operations](docs/deployment.md)
+- [Public repository readiness audit](docs/public-readiness-audit.md)
 - [Small-ad options and policy research](docs/monetization.md)
 - [Hosted-use license](LICENSE) ([website copy](https://embedify.javadevjt.tech/license))
 
