@@ -1,0 +1,107 @@
+name: Transient TrueNAS runner proof
+on:
+  push:
+    branches: [codex/truenas-transient-smoke-20260928]
+permissions:
+  contents: read
+jobs:
+  smoke:
+    name: Transient smoke (${{ matrix.expected_failure }})
+    runs-on: truenas-embedify
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        expected_failure: [false, true]
+    steps:
+      - name: Verify disposable runner permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(id -u)" = 1001
+          test "$(awk '/^CapEff:/ {print $2}' /proc/self/status)" = 0000000000000000
+          test "$(awk '/^NoNewPrivs:/ {print $2}' /proc/self/status)" = 1
+          test ! -S /var/run/docker.sock
+          test ! -S /run/docker/docker.sock
+          test ! -e /mnt/.ix-apps
+          test ! -e /tmp/private/github-app.json
+          test "$(stat -c %a "$BUILDKIT_TLS_CLIENT_KEY")" = 600
+          test -w /opt/hostedtoolcache
+          if sudo -n true 2>/dev/null; then exit 1; fi
+          jq --version
+          node --version
+          echo "Fresh runner: $RUNNER_NAME"
+          mkdir -p "$RUNNER_TEMP/build-proof"
+          cat > "$RUNNER_TEMP/build-proof/Dockerfile" <<'DOCKERFILE'
+          FROM alpine:3.22
+          RUN test "$(id -u)" = 0 && adduser -D -u 2345 smoke && mkdir /proof && echo rootless-build-passed > /proof/result && chown 2345:2345 /proof/result
+          USER 2345
+          RUN test "$(id -u)" = 2345 && test "$(cat /proof/result)" = rootless-build-passed
+          DOCKERFILE
+      - name: Check anonymous builder access is rejected
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {connect} from 'node:tls';
+          await new Promise((resolve, reject) => {
+            const socket = connect({host:'buildkit', port:1234, servername:'buildkit',
+              ca:readFileSync(process.env.BUILDKIT_TLS_CA_CERT),
+              minVersion:'TLSv1.3', maxVersion:'TLSv1.3', rejectUnauthorized:true});
+            socket.setTimeout(10000, () => socket.destroy(new Error('No client-certificate rejection')));
+            socket.once('secureConnect', () => socket.write('\0'));
+            socket.once('error', error => {
+              try { assert.equal(error.code, 'ERR_SSL_TLSV13_ALERT_CERTIFICATE_REQUIRED'); resolve(); }
+              catch (failure) { reject(failure); }
+            });
+            socket.once('end', () => reject(new Error('Anonymous TLS connection was accepted')));
+          });
+          console.log('Builder requires a client certificate');
+          NODE
+      - name: Set up Python
+        if: ${{ !matrix.expected_failure }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+      - name: Set up Node
+        if: ${{ !matrix.expected_failure }}
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+      - name: Set up Java
+        if: ${{ !matrix.expected_failure }}
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Verify language toolchains
+        if: ${{ !matrix.expected_failure }}
+        run: python --version && node --version && npm --version && mvn --version
+      - name: Use the job's isolated builder
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+        with:
+          driver: remote
+          endpoint: ${{ env.BUILDKIT_HOST }}
+          driver-opts: |
+            cacert=${{ env.BUILDKIT_TLS_CA_CERT }}
+            cert=${{ env.BUILDKIT_TLS_CLIENT_CERT }}
+            key=${{ env.BUILDKIT_TLS_CLIENT_KEY }}
+      - name: Prove real Docker build and GitHub cache
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+        with:
+          context: ${{ runner.temp }}/build-proof
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=truenas-transient-proof
+          cache-to: type=gha,mode=max,scope=truenas-transient-proof
+          outputs: type=oci,dest=${{ runner.temp }}/proof.tar
+      - name: Confirm output and hold for runtime attribution
+        run: |
+          test -s "$RUNNER_TEMP/proof.tar"
+          docker buildx inspect --bootstrap
+          echo 'Build complete; verifying TrueNAS container attribution.'
+          sleep 40
+      - name: Deliberate failure for cleanup proof
+        if: ${{ matrix.expected_failure }}
+        run: exit 17
