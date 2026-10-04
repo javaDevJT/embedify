@@ -1,5 +1,55 @@
 # Public repository readiness audit
 
+## CI failure review — October 4, 2026
+
+Fix acceptance: retain the High/Critical gate without ignored findings; preserve jlink, HTTPS trust, UID 10001, and container restrictions; qualify a supported smaller BuildKit reservation; publish and deploy only the passing immutable image; verify runtime identity, served assets, and the synthetic embed browser regression.
+
+Fix ownership: primary owns runtime selection, repository edits, integration, and release. `/root/storage_fix_qualification` owns a read-only reservation investigation used by the workflow decision. Base revision: `40131c2`. The October 4 native spawn catalog lists one callable Luna model. Worker request: `gpt-6-luna`, maximum supported effort `max`; backend model and priority are unexposed. Native completion releases capacity. Independent review follows the concrete patch.
+
+Reviewed current main `40131c2617435bee3cacbd90b86d9382b7196ac6` and failed run `37240145502`. The four recent commits change the workflow, scanner action, and CI policy check; they do not change the application, Dockerfile, or Maven dependencies. The public builder, embed, license, and both health endpoints returned HTTP 200. TrueNAS reports the previously deployed image `sha256:1526d6a67d1d3bf481f517b7beb0a15dc33ca8e069688a0e88070b74f0c3ad3e` as `RUNNING`.
+
+### 1. The vulnerability gate is correctly blocking the current runtime image
+
+Backend/UI verification passed. Syft generated the image SBOM; Grype returned exit 2 because its `--fail-on high` policy found **15 High matches across nine CVEs and seven Debian packages**. No Critical matches appeared in the blocking set. The retained report is artifact `11316993184`, `container-security-publish-0-build-1`.
+
+| Packages | Blocking matches | Reported fix state |
+| --- | ---: | --- |
+| `libssl3t64` (`3.5.7-1~deb13u2`) | 4 | Fixed in `3.5.7-1~deb13u3` |
+| `libc6` (`2.41-12+deb13u4`) | 2 | Won't-fix |
+| `gcc-14-base`, `libgcc-s1`, `libgomp1`, `libstdc++6` (`14.2.0-19`) | 8 | Not-fixed |
+| `zlib1g` (`1:1.3.dfsg+really1.3.1-1+b1`) | 1 | Not-fixed |
+
+The OpenSSL matches are `CVE-2026-54873`, `CVE-2026-84782`, `CVE-2026-84784`, and `CVE-2026-72897`. The other matches are `CVE-2026-5435`, `CVE-2026-19499`, `CVE-2026-95619`, `CVE-2026-102010`, and `CVE-2026-85091`. These are scanner findings, not a demonstration of exploitability through Embedify.
+
+`Dockerfile:52` still pins the Distroless Debian runtime to digest `54df941ed0d06a1bd95ef5e0ce391fd8d9f94b64782dc9a60062727849ee3f97`. Rebuilding the same pinned image daily does not pick up a newer base. Refreshing that pin to a verified patched base is the first remedy, but the other eleven matches have no fix in the retained report. They need mitigation or a deliberate, reviewed exception before this strict policy can pass; lowering severity or silently ignoring unfixed findings would change the requested protection.
+
+### 2. The BuildKit reservation fails the separate utilization policy
+
+`ci.yml:50` requests `truenas-embedify-storage-32g`. The always-run storage check at `ci.yml:124-126` failed independently after the scanner. Artifact `11316838689` contains a valid report with 32 GiB requested/available, a 1,495,375,872-byte peak (about 1.393 GiB, **4.35%** utilization), 3,544 samples, and no measurement error.
+
+The runner helper intentionally fails at or below 80% utilization (`5 × peak <= 4 × requested`). This is an oversized-reservation failure, not an out-of-space condition. At 32 GiB, passing requires a peak above 25.6 GiB. An 8 GiB reservation would also fail at this measured peak.
+
+Right-size the publish reservation from representative cold and warm builds, retaining enough headroom. This single run does not establish a safe quota; at this peak the current rule requires a quota below approximately 1.74 GiB. The internal helper's local predicate and matching runtime message were reviewed, but its deployed source digest was not independently verified.
+
+### Fix qualification
+
+The replacement runtime is digest-pinned `cgr.dev/chainguard/glibc-dynamic` (`82edc253a57efee78d0fb504e11a93b7c74687b1b736110ad3a2a4f3edf632ab`). Grype 0.118.0 with an explicit empty config and the unchanged `--fail-on high` threshold reported zero High/Critical matches for the base and complete clean application image. Latest Distroless Debian 12/13 alternatives still had 17/11 blocking matches. No findings were ignored. The new base retains its Wolfi package metadata; CI continues generating a complete-image Syft SBOM and Grype report.
+
+The clean amd64 build ran as UID 10001 with the production read-only filesystem, dropped capabilities, no-new-privileges, 512 MiB memory limit, and 16 MiB `/tmp`. Health, builder, embed, license, and CalendarLabs HTTPS feed requests succeeded. All three served JavaScript/CSS assets matched source; the existing synthetic event-title browser regression passed. An initial local cloud-backed build contained an empty `app.js`; its browser check failed, so it was rejected and rebuilt from the clean temporary checkout.
+
+The runner proposal is `truenas-embedify-storage-1p6g`, an exact page-rounded quota of 1,717,989,376 bytes. The previous peak would use 87.04%, leaving 222,613,504 bytes. This is a proposal until actual new-base builds qualify it. The runner change adds numeric `1.6` only to Embedify's existing classes; the rendered Compose change is limited to that target payload. Both CI gates remain intact.
+
+Worker handoffs: `/root/storage_fix_qualification` completed read-only; its exact quota/parser and guarded deployment findings were accepted, while primary verified the renderer requires `all`. `/root/runtime_fix_review` completed read-only with no runtime blocker. Primary verified Docker dependency updates are already configured, superseding the review's claim that only Actions updates exist. Native library paths exercised by startup/HTTPS and the browser regression pass; `jdeps` is not a full ELF audit. Both workers were accepted and released through native completion. The primary remains responsible for CI and deployment proof.
+
+### Release behavior and checks
+
+The build uploads a candidate digest to private GHCR so it can be scanned. Release SHA tags are only created by the later publish step, which did not run after either failure. Production was not updated by these failed CI runs.
+
+Existing CI trust-policy checks and shell syntax validation passed locally. The latest completed run's backend/UI job also passed. No private calendar feed was requested. This review establishes current endpoint availability and the two release blockers; it does not establish all calendar inputs work or that every scanner match is reachable in the running service.
+
+## September 28 publication audit
+
+
 Audit date: September 28, 2026. Application/worktree snapshot: `0416eff`. The temporary remote mirror also includes main revision `6cff659`; its only change is two GitHub Actions build-cache settings, which were reviewed and do not resolve the findings below. The worktree was not reset or updated to that revision.
 
 Publication status: the owner authorized publication on September 28, 2026. The repository is public, its public-state protections are verified, and the GHCR package remains private. A fresh build passed CI under those settings and is deployed with successful live checks.

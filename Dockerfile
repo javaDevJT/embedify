@@ -49,7 +49,8 @@ RUN set -eu; \
     printf 'embedify:x:10001:\n' > /tmp/embedify.group; \
     /opt/runtime/bin/java --version
 
-FROM gcr.io/distroless/cc-debian13:nonroot@sha256:54df941ed0d06a1bd95ef5e0ce391fd8d9f94b64782dc9a60062727849ee3f97
+# Minimal glibc/C++ runtime; retain its package metadata for full-image scanning.
+FROM cgr.dev/chainguard/glibc-dynamic:latest@sha256:82edc253a57efee78d0fb504e11a93b7c74687b1b736110ad3a2a4f3edf632ab
 
 ENV JAVA_HOME=/opt/runtime
 WORKDIR /app
