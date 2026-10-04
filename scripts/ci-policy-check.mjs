@@ -30,7 +30,7 @@ for (const head of ['outsider/embedify', 'javaDevJT/other-fork']) {
 }
 assert.equal(verify(context('pull_request_target')), true, 'Same-repository PRs should be checked');
 assert.equal(publish(context('pull_request_target')), false, 'PR checks must not publish');
-for (const event of ['push', 'workflow_dispatch']) {
+for (const event of ['push', 'workflow_dispatch', 'schedule']) {
   assert.equal(verify(context(event)), true);
   assert.equal(publish(context(event)), true);
   assert.equal(verify(context(event, undefined, 'refs/heads/untrusted')), false);
