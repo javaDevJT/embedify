@@ -15,8 +15,11 @@ jobs:
     name: Build and test
     # Evaluated from the trusted base workflow before allocating a runner.
     if: github.ref == 'refs/heads/main' && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: truenas-embedify
+    runs-on: truenas-embedify-storage-8g
     steps:
+      - name: Prepare disk dependency cache
+        id: ci_disk_cache_downloads
+        run: ci-cache downloads
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -28,8 +31,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-          cache: maven
-
       - name: Run backend checks
         run: mvn -B -ntp verify
 
@@ -43,7 +44,7 @@ jobs:
     name: Publish private GHCR image
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: verify
-    runs-on: truenas-embedify
+    runs-on: truenas-embedify-storage-32g
     permissions:
       contents: read
       packages: write
@@ -77,12 +78,17 @@ jobs:
             cacert=/run/buildkit/tls/ca.pem
             cert=/run/buildkit/tls/client.pem
             key=/run/buildkit/tls/client.key
+      - name: Prepare disk build cache
+        id: ci_disk_cache_1
+        run: ci-cache "truenas-2d6f64944e6bd27a"
       - name: Build and publish image with provenance and SBOM attestations
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
-          cache-from: type=gha,version=2,scope=truenas-2d6f64944e6bd27a
-          cache-to: type=gha,version=2,mode=max,scope=truenas-2d6f64944e6bd27a
+          cache-from: |
+            type=local,src=${{ steps.ci_disk_cache_1.outputs.from }}
+            type=gha,version=2,scope=truenas-2d6f64944e6bd27a
+          cache-to: ${{ steps.ci_disk_cache_1.outputs.to && format('type=local,dest={0},mode=max,ignore-error=true', steps.ci_disk_cache_1.outputs.to) || '' }}
           context: .
           push: true
           tags: ${{ steps.image.outputs.name }}:sha-${{ github.sha }}
