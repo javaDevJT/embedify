@@ -6,6 +6,8 @@ Run `37339194224` at `9e49be3` passed application checks but failed publishing w
 
 Diagnostic run `37341716311` at `0c1811b` also failed with ENOSPC before scanning on the existing 8 GiB class. Its valid storage report peaked at 8,559,665,152 of 8,589,934,592 bytes. The next measurement uses the existing 32 GiB class to obtain the full build peak. Both the unchanged High/Critical vulnerability gate and the greater-than-80% storage utilization gate remain enforced. Failed capped peaks cannot determine the final reservation; qualification must use successful-build measurements and sufficient headroom.
 
+Run `37342617084` at `265a209` completed the image build and passed the full-image vulnerability gate: zero High/Critical matches, three Medium and two Low, zero ignored matches. The valid storage report measured 9,436,807,168 bytes (8.79 GiB), so the 32 GiB utilization gate correctly failed at 27.46%. A 10 GiB class is the next qualification candidate (87.89% utilization at that measured peak). Live-to-candidate Compose comparison confirms only Embedify classes change from `[1.6,8,32]` to `[8,10,32]`; controller source and all other settings match. The guarded deployment waits for unrelated active work rather than interrupting it.
+
 ## CI failure review — October 4, 2026
 
 Fix acceptance: retain the High/Critical gate without ignored findings; preserve jlink, HTTPS trust, UID 10001, and container restrictions; qualify a supported smaller BuildKit reservation; publish and deploy only the passing immutable image; verify runtime identity, served assets, and the synthetic embed browser regression.
