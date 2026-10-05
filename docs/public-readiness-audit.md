@@ -1,5 +1,11 @@
 # Public repository readiness audit
 
+## CI storage qualification — October 5, 2026
+
+Run `37339194224` at `9e49be3` passed application checks but failed publishing with BuildKit `native` snapshotter `no space left on device`. Its valid report measured a 1,715,294,208-byte peak against a 1,717,989,376-byte reservation. Several build steps were cached; this was not an uncached build. The vulnerability scan was not reached. The proposed 1.6 GiB class is therefore too small and is not qualified for release.
+
+The next build uses the existing 8 GiB class to measure a completed build. Both the unchanged High/Critical vulnerability gate and the greater-than-80% storage utilization gate remain enforced. The failed capped peak cannot determine the final reservation; qualification must use successful-build measurements and sufficient headroom.
+
 ## CI failure review — October 4, 2026
 
 Fix acceptance: retain the High/Critical gate without ignored findings; preserve jlink, HTTPS trust, UID 10001, and container restrictions; qualify a supported smaller BuildKit reservation; publish and deploy only the passing immutable image; verify runtime identity, served assets, and the synthetic embed browser regression.

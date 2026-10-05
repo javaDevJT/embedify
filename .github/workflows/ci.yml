@@ -47,7 +47,7 @@ jobs:
     name: Publish private GHCR image
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
     needs: verify
-    runs-on: truenas-embedify-storage-1p6g
+    runs-on: truenas-embedify-storage-8g
     permissions:
       contents: read
       packages: write
