@@ -14,6 +14,8 @@ The natural idle window allowed TrueNAS job `96` to deploy only the reviewed Emb
 
 Run `37359981617` passed at 9,436,712,960 / 10,737,418,240 bytes (87.89%), with zero High/Critical and zero ignored findings. Its sequential repeat `37361154825` reused the complete local layer cache and peaked at only 1,166,667,776 bytes (10.87%), failing the unchanged utilization floor. A single fixed reservation cannot serve both footprints. Publishing now rebuilds container layers without cache import/export, while backend dependency caching remains enabled. A 32 GiB diagnostic measures the complete fresh native build before selecting the final publishing class; a failed diagnostic image cannot be released.
 
+Fresh diagnostic `37363051460` at `7598c5a` completed the image and vulnerability checks with zero cached Dockerfile steps. Its valid peak was 9,231,048,704 bytes (8.60 GiB); 32 GiB correctly failed the utilization floor. The existing 10 GiB class would use 85.97%, leaving 1,506,369,536 bytes of headroom. Publishing returns to that deployed class for actual fresh-build and repeat qualification. Production still uses the previous successful image until those gates pass.
+
 ## CI failure review — October 4, 2026
 
 Fix acceptance: retain the High/Critical gate without ignored findings; preserve jlink, HTTPS trust, UID 10001, and container restrictions; qualify a supported smaller BuildKit reservation; publish and deploy only the passing immutable image; verify runtime identity, served assets, and the synthetic embed browser regression.
