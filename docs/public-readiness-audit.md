@@ -8,6 +8,10 @@ Diagnostic run `37341716311` at `0c1811b` also failed with ENOSPC before scannin
 
 Run `37342617084` at `265a209` completed the image build and passed the full-image vulnerability gate: zero High/Critical matches, three Medium and two Low, zero ignored matches. The valid storage report measured 9,436,807,168 bytes (8.79 GiB), so the 32 GiB utilization gate correctly failed at 27.46%. A 10 GiB class is the next qualification candidate (87.89% utilization at that measured peak). Live-to-candidate Compose comparison confirms only Embedify classes change from `[1.6,8,32]` to `[8,10,32]`; controller source and all other settings match. The guarded deployment waits for unrelated active work rather than interrupting it.
 
+Scheduled run `37345662949` independently measured 9,464,360,960 bytes (8.81 GiB) on the same source and 32 GiB native runner. Both measurements imported cached Maven stages from GHA with the local cache unavailable. They support a 10 GiB candidate, but do not yet qualify a fully cached successful-job export or an uncached build. The owner requested waiting for a natural idle fleet window before deploying the runner change.
+
+The natural idle window allowed TrueNAS job `96` to deploy only the reviewed Embedify class replacement. Post-deployment verification passed for all 26 repository listeners, rootless operation, idle resources, and credential permissions; controller source remains `73389ef1bc312c56`. The shared console helper now waits for successful terminal echo suppression before sending a script; `bun scripts/check-console-transport.mjs` in the runner repository checks both services with long input, nonzero exit status, and no echoed script content. The 10 GiB CI run is the next release gate.
+
 ## CI failure review — October 4, 2026
 
 Fix acceptance: retain the High/Critical gate without ignored findings; preserve jlink, HTTPS trust, UID 10001, and container restrictions; qualify a supported smaller BuildKit reservation; publish and deploy only the passing immutable image; verify runtime identity, served assets, and the synthetic embed browser regression.
