@@ -4,7 +4,7 @@
 
 Run `37339194224` at `9e49be3` passed application checks but failed publishing with BuildKit `native` snapshotter `no space left on device`. Its valid report measured a 1,715,294,208-byte peak against a 1,717,989,376-byte reservation. Several build steps were cached; this was not an uncached build. The vulnerability scan was not reached. The proposed 1.6 GiB class is therefore too small and is not qualified for release.
 
-The next build uses the existing 8 GiB class to measure a completed build. Both the unchanged High/Critical vulnerability gate and the greater-than-80% storage utilization gate remain enforced. The failed capped peak cannot determine the final reservation; qualification must use successful-build measurements and sufficient headroom.
+Diagnostic run `37341716311` at `0c1811b` also failed with ENOSPC before scanning on the existing 8 GiB class. Its valid storage report peaked at 8,559,665,152 of 8,589,934,592 bytes. The next measurement uses the existing 32 GiB class to obtain the full build peak. Both the unchanged High/Critical vulnerability gate and the greater-than-80% storage utilization gate remain enforced. Failed capped peaks cannot determine the final reservation; qualification must use successful-build measurements and sufficient headroom.
 
 ## CI failure review — October 4, 2026
 
