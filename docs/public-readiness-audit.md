@@ -12,6 +12,8 @@ Scheduled run `37345662949` independently measured 9,464,360,960 bytes (8.81 GiB
 
 The natural idle window allowed TrueNAS job `96` to deploy only the reviewed Embedify class replacement. Post-deployment verification passed for all 26 repository listeners, rootless operation, idle resources, and credential permissions; controller source remains `73389ef1bc312c56`. The shared console helper now waits for successful terminal echo suppression before sending a script; `bun scripts/check-console-transport.mjs` in the runner repository checks both services with long input, nonzero exit status, and no echoed script content. The 10 GiB CI run is the next release gate.
 
+Run `37359981617` passed at 9,436,712,960 / 10,737,418,240 bytes (87.89%), with zero High/Critical and zero ignored findings. Its sequential repeat `37361154825` reused the complete local layer cache and peaked at only 1,166,667,776 bytes (10.87%), failing the unchanged utilization floor. A single fixed reservation cannot serve both footprints. Publishing now rebuilds container layers without cache import/export, while backend dependency caching remains enabled. A 32 GiB diagnostic measures the complete fresh native build before selecting the final publishing class; a failed diagnostic image cannot be released.
+
 ## CI failure review — October 4, 2026
 
 Fix acceptance: retain the High/Critical gate without ignored findings; preserve jlink, HTTPS trust, UID 10001, and container restrictions; qualify a supported smaller BuildKit reservation; publish and deploy only the passing immutable image; verify runtime identity, served assets, and the synthetic embed browser regression.

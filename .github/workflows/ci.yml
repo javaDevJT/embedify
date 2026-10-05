@@ -47,7 +47,7 @@ jobs:
     name: Publish private GHCR image
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
     needs: verify
-    runs-on: truenas-embedify-storage-10g
+    runs-on: truenas-embedify-storage-32g
     permissions:
       contents: read
       packages: write
@@ -83,9 +83,6 @@ jobs:
             cacert=/run/buildkit/tls/ca.pem
             cert=/run/buildkit/tls/client.pem
             key=/run/buildkit/tls/client.key
-      - name: Prepare disk build cache
-        id: ci_disk_cache_1
-        run: ci-cache "truenas-2d6f64944e6bd27a"
       - name: Prepare immutable image and release tags
         id: container_security_1
         shell: bash
@@ -101,10 +98,8 @@ jobs:
         with:
           platforms: linux/amd64
           outputs: ${{ steps.container_security_1.outputs.exporter }}
-          cache-from: |
-            type=local,src=${{ steps.ci_disk_cache_1.outputs.from }}
-            type=gha,version=2,scope=truenas-2d6f64944e6bd27a
-          cache-to: ${{ steps.ci_disk_cache_1.outputs.to && format('type=local,dest={0},mode=max,ignore-error=true', steps.ci_disk_cache_1.outputs.to) || '' }}
+          # Fresh release builds have a consistent footprint for the strict storage gate.
+          no-cache: true
           context: .
           push: false # Push-by-digest is configured in the exporter; tags follow the scan.
           tags: ${{ steps.container_security_1.outputs.repository }}
