@@ -2,7 +2,7 @@ name: CI and private image
 
 on:
   schedule:
-    - cron: '5 4 * * *'
+    - cron: '22 0 * * *'
       timezone: America/Detroit
   pull_request_target:
   push:
