@@ -52,6 +52,7 @@ jobs:
       contents: read
       packages: write
     env:
+      CI_CACHE_DISABLE: '1'
       BUILDKIT_HOST: tcp://buildkit:1234
       BUILDKIT_TLS_CA_CERT: /run/buildkit/tls/ca.pem
       BUILDKIT_TLS_CLIENT_CERT: /run/buildkit/tls/client.pem
