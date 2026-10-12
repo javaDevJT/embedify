@@ -1,0 +1,138 @@
+name: One-off approved artifact cleanup
+'on':
+  push:
+    branches: [dot/artifact-cleanup-20261012-a99c4055cf]
+permissions: {}
+concurrency:
+  group: approved-artifact-cleanup-20261012
+  cancel-in-progress: false
+jobs:
+  delete-approved-artifacts:
+    if: github.repository == 'javaDevJT/embedify' && github.ref == 'refs/heads/dot/artifact-cleanup-20261012-a99c4055cf' && github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Verify and delete exact approved artifact IDs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PYTHON_EXACT_MANIFEST'
+          import datetime as dt
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.request
+          
+          
+          def require(condition, message):
+              if not condition:
+                  raise RuntimeError(message)
+          
+          
+          def timestamp(value):
+              return dt.datetime.fromisoformat(value.replace('Z', '+00:00'))
+          
+          
+          def validate_manifest(manifest):
+              require(manifest['repository'].startswith('javaDevJT/'), 'Wrong owner')
+              require(manifest['cutoff'] == '2026-10-11T02:52:00Z', 'Wrong cutoff')
+              items = manifest['artifacts']
+              require(len(items) == manifest['count'], 'Wrong manifest count')
+              require(sum(a['size_in_bytes'] for a in items) == manifest['bytes'], 'Wrong manifest bytes')
+              require(len({a['id'] for a in items}) == len(items), 'Duplicate artifact IDs')
+              for a in items:
+                  require(type(a['id']) is int and a['id'] > 0, 'Invalid ID')
+                  require(type(a['run_id']) is int and a['run_id'] > 0, 'Invalid run ID')
+                  require(a['run_status'] == 'completed', 'Unfinished manifest run')
+                  require(timestamp(a['created_at']) < timestamp(manifest['cutoff']), 'New manifest artifact')
+          
+          
+          def validate_actual(actual, expected, cutoff):
+              for key in ('id', 'name', 'created_at', 'size_in_bytes'):
+                  require(actual.get(key) == expected[key], 'Artifact metadata mismatch: ' + key)
+              require(actual.get('workflow_run', {}).get('id') == expected['run_id'], 'Artifact run mismatch')
+              require(timestamp(actual['created_at']) < timestamp(cutoff), 'Artifact not strictly before cutoff')
+          
+          
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  raise RuntimeError('Unexpected API redirect')
+          
+          
+          def main(manifest, branch, request=None):
+              validate_manifest(manifest)
+              repo = manifest['repository']
+              require(os.environ.get('GITHUB_REPOSITORY') == repo, 'Wrong repository')
+              require(os.environ.get('GITHUB_REPOSITORY_OWNER') == 'javaDevJT', 'Wrong repository owner')
+              require(os.environ.get('GITHUB_REF') == 'refs/heads/' + branch, 'Wrong branch')
+              require(os.environ.get('GITHUB_EVENT_NAME') == 'push', 'Wrong event')
+              require(os.environ.get('GITHUB_API_URL') == 'https://api.github.com', 'Wrong API host')
+              opener = urllib.request.build_opener(NoRedirect())
+              if request is None:
+                  def request(method, path):
+                      req = urllib.request.Request('https://api.github.com/repos/' + repo + path, method=method,
+                          headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                                   'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'})
+                      try:
+                          with opener.open(req, timeout=45) as response:
+                              body = response.read()
+                              return response.status, json.loads(body) if body else None
+                      except urllib.error.HTTPError as error:
+                          return error.code, None
+              status, metadata = request('GET', '')
+              require(status == 200 and metadata.get('full_name') == repo, 'Repository identity check failed')
+              results = []
+              deleted_bytes = 0
+              try:
+                  for expected in manifest['artifacts']:
+                      aid = expected['id']
+                      path = '/actions/artifacts/' + str(aid)
+                      status, actual = request('GET', path)
+                      if status in (404, 410):
+                          results.append({'id': aid, 'result': 'already_missing'})
+                          continue
+                      require(status == 200, 'Artifact GET failed: ' + str(status))
+                      validate_actual(actual, expected, manifest['cutoff'])
+                      if actual.get('expired') is True:
+                          results.append({'id': aid, 'result': 'already_expired'})
+                          continue
+                      status, run = request('GET', '/actions/runs/' + str(expected['run_id']))
+                      require(status == 200 and run.get('id') == expected['run_id'], 'Run lookup failed')
+                      require(run.get('repository', {}).get('full_name') == repo, 'Run repository mismatch')
+                      require(run.get('status') == 'completed', 'Run is not completed')
+                      # Repeat artifact identity and cutoff checks immediately before DELETE.
+                      status, actual = request('GET', path)
+                      if status in (404, 410):
+                          results.append({'id': aid, 'result': 'already_missing'})
+                          continue
+                      require(status == 200, 'Artifact recheck failed: ' + str(status))
+                      validate_actual(actual, expected, manifest['cutoff'])
+                      if actual.get('expired') is True:
+                          results.append({'id': aid, 'result': 'already_expired'})
+                          continue
+                      status, _ = request('DELETE', path)
+                      require(status in (204, 404, 410), 'Artifact DELETE failed: ' + str(status))
+                      result = 'deleted' if status == 204 else 'already_missing'
+                      if status == 204:
+                          deleted_bytes += expected['size_in_bytes']
+                      results.append({'id': aid, 'result': result, 'size_in_bytes': expected['size_in_bytes']})
+                      print(json.dumps(results[-1]), flush=True)
+              finally:
+                  report = {'repository': repo, 'cutoff': manifest['cutoff'], 'planned_count': manifest['count'],
+                            'processed_count': len(results), 'deleted_count': sum(r['result'] == 'deleted' for r in results),
+                            'deleted_bytes': deleted_bytes, 'results': results}
+                  print('CLEANUP_RESULT=' + json.dumps(report), flush=True)
+                  if os.environ.get('GITHUB_STEP_SUMMARY'):
+                      with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+                          out.write('Exact-manifest cleanup: ' + json.dumps({k:v for k,v in report.items() if k != 'results'}) + '\n')
+              return report
+          
+          import base64,zlib
+          MANIFEST = json.loads(zlib.decompress(base64.b64decode('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')))
+          main(MANIFEST, 'dot/artifact-cleanup-20261012-a99c4055cf')
+          PYTHON_EXACT_MANIFEST
