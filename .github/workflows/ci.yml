@@ -65,6 +65,9 @@ jobs:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+        with:
+          persist-credentials: false
+
       - name: Compute lowercase image name
         id: image
         shell: bash
@@ -164,7 +167,7 @@ jobs:
   cleanup-artifacts:
     name: Remove transient build artifacts
     needs: ["verify","publish"]
-    if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ always() && ((github.event_name != 'pull_request' && github.event_name != 'pull_request_target') || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: truenas-embedify-storage-8g
     timeout-minutes: 10
     permissions:
