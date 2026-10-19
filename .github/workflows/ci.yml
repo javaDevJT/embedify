@@ -19,7 +19,7 @@ jobs:
   verify:
     name: Build and test
     # Evaluated from the trusted base workflow before allocating a runner.
-    if: github.repository == 'javaDevJT/embedify' && github.ref == 'refs/heads/main' && (github.event_name != 'pull_request_target' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.actor == 'javaDevJT' && github.event.pull_request.user.login == 'javaDevJT') || (github.actor == 'quarterback-ci[bot]' && github.event.pull_request.user.id == 341165314))))
+    if: github.repository == 'javaDevJT/embedify' && github.ref == 'refs/heads/main' && (github.event_name != 'pull_request_target' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.actor == 'javaDevJT' && github.event.pull_request.user.login == 'javaDevJT') || (github.actor == 'quarterback-ci[bot]' && github.event.pull_request.user.id == 341165314) || (github.actor == 'dependabot[bot]' && github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.user.id == 49699333))))
     runs-on: truenas-embedify-storage-8g
     steps:
       - name: Prepare disk dependency cache
