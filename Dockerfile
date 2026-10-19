@@ -52,6 +52,9 @@ RUN set -eu; \
 # Minimal glibc/C++ runtime; retain its package metadata for full-image scanning.
 FROM cgr.dev/chainguard/glibc-dynamic:latest@sha256:82edc253a57efee78d0fb504e11a93b7c74687b1b736110ad3a2a4f3edf632ab
 
+ARG QB_SOURCE_COMMIT=unknown
+ENV QB_SOURCE_COMMIT=${QB_SOURCE_COMMIT}
+
 ENV JAVA_HOME=/opt/runtime
 WORKDIR /app
 
