@@ -1,5 +1,11 @@
 # Public repository readiness audit
 
+## Native code scanning — October 20, 2026
+
+The [code-scanning workflow](../.github/workflows/code-scanning.yml) runs Semgrep 1.179.0 with the existing `p/security-audit` policy on the private `truenas-embedify-storage-8g` runner. It writes SARIF to a mode-600 temporary file, uploads it directly through `github/codeql-action/upload-sarif` at commit `6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee` (`v4.39.0`), and removes the report and scanner environment afterward.
+
+The selected-actions settings retain `github_owned_allowed=false`, `verified_allowed=false`, and `sha_pinning_required=true`; this uploader is explicitly allowed by its exact SHA alongside all prior allowlist entries. If the pin changes, update its exact allowlist entry and workflow reference together. Dependabot PRs run only the `contents: read` scan job and never upload SARIF; fork PRs are excluded from the private runner.
+
 ## CI storage qualification — October 5, 2026
 
 Run `37339194224` at `9e49be3` passed application checks but failed publishing with BuildKit `native` snapshotter `no space left on device`. Its valid report measured a 1,715,294,208-byte peak against a 1,717,989,376-byte reservation. Several build steps were cached; this was not an uncached build. The vulnerability scan was not reached. The proposed 1.6 GiB class is therefore too small and is not qualified for release.
