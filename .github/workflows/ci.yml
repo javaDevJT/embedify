@@ -45,6 +45,9 @@ jobs:
       - name: Check CI trust policy
         run: node scripts/ci-policy-check.mjs
 
+      - name: Check OpenTelemetry deployment policy
+        run: node scripts/observability-check.mjs
+
   publish:
     name: Publish private GHCR image
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
@@ -187,4 +190,3 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 .github/scripts/cleanup-actions-artifacts.py --current
-

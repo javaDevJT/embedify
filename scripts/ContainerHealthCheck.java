@@ -7,7 +7,9 @@ public final class ContainerHealthCheck {
     public static void main(String[] args) {
         HttpURLConnection connection = null;
         try {
-            connection = (HttpURLConnection) URI.create("http://127.0.0.1:8080/healthz")
+            String healthcheckUrl = System.getenv().getOrDefault(
+                    "EMBEDIFY_HEALTHCHECK_URL", "http://127.0.0.1:8080/healthz");
+            connection = (HttpURLConnection) URI.create(healthcheckUrl)
                     .toURL()
                     .openConnection();
             connection.setConnectTimeout(1500);

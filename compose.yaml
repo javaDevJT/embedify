@@ -8,12 +8,30 @@ services:
     user: "10001:10001"
     environment:
       EMBEDIFY_TRUSTED_PROXIES: "${EMBEDIFY_TRUSTED_PROXIES:-}"
+      OTEL_SERVICE_NAME: embedify
+      OTEL_RESOURCE_ATTRIBUTES: "service.namespace=javadevjt,service.version=${EMBEDIFY_IMAGE:?Set EMBEDIFY_IMAGE to the published GHCR digest},deployment.environment.name=production"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_TIMEOUT: "5000"
+      OTEL_BSP_SCHEDULE_DELAY: "5000"
+      OTEL_BSP_EXPORT_TIMEOUT: "5000"
+      OTEL_BSP_MAX_QUEUE_SIZE: "1024"
+      OTEL_BSP_MAX_EXPORT_BATCH_SIZE: "256"
+      OTEL_METRICS_EXPORT_INTERVAL: "60000"
+      OTEL_BLRP_SCHEDULE_DELAY: "5000"
+      OTEL_BLRP_EXPORT_TIMEOUT: "5000"
+      OTEL_BLRP_MAX_QUEUE_SIZE: "1024"
+      OTEL_BLRP_MAX_EXPORT_BATCH_SIZE: "256"
     networks:
-      - proxy
+      proxy: null
+      telemetry: null
     ports:
       - target: 8080
         published: "${EMBEDIFY_PORT:-30024}"
-        host_ip: "${EMBEDIFY_BIND_ADDRESS:-192.168.0.2}"
+        host_ip: "${EMBEDIFY_BIND_ADDRESS:?Set EMBEDIFY_BIND_ADDRESS in the ignored .env file}"
         protocol: tcp
     read_only: true
     cap_drop:
@@ -27,7 +45,37 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=16m,uid=10001,gid=10001,mode=1777
 
+  otel-collector:
+    image: ${EMBEDIFY_IMAGE:?Set EMBEDIFY_IMAGE to the published GHCR digest}
+    container_name: embedify-otel-collector
+    entrypoint: ["/opt/otelcol-contrib"]
+    command: ["--config=/etc/embedify-otel/collector.yaml"]
+    restart: unless-stopped
+    user: "10001:10001"
+    environment:
+      EMBEDIFY_HEALTHCHECK_URL: http://127.0.0.1:13133/
+      OPENWOOF_INGEST_KEY_FILE: /run/secrets/openwoof-ingest-key
+    networks:
+      telemetry: null
+    volumes:
+      - type: bind
+        source: ${OPENWOOF_INGEST_KEY_PATH:?Set OPENWOOF_INGEST_KEY_PATH to the protected TrueNAS file}
+        target: /run/secrets/openwoof-ingest-key
+        read_only: true
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 128m
+    cpus: 0.5
+    stop_grace_period: 20s
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=8m,uid=10001,gid=10001,mode=1777
+
 networks:
   proxy:
     external: true
-    name: ix-nginx-proxy-manager_default
+    name: ${EMBEDIFY_PROXY_NETWORK:?Set EMBEDIFY_PROXY_NETWORK in the ignored .env file}
+  telemetry: {}
