@@ -29,12 +29,20 @@ assert.match(dockerfile, /ADD --checksum=sha256:[a-f0-9]{64}[\s\\\n]*https:\/\/g
   'Java agent must be downloaded from the official release with a pinned checksum.');
 assert.match(dockerfile, /ENTRYPOINT \["\/opt\/runtime\/bin\/java", "-javaagent:\/opt\/opentelemetry-javaagent\.jar"/,
   'The application must start with the pinned Java agent.');
+assert.match(dockerfile, /modules="\$\{modules\},jdk\.crypto\.ec,java\.instrument"/,
+  'The reduced runtime must retain the agent module even if app dependencies stop referencing it.');
 assert.match(dockerfile, /otelcol-contrib validate --config=\/tmp\/collector\.yaml/,
   'The release build must validate the actual Collector configuration.');
 assert.match(dockerfile, /COPY scripts\/OtelSmoke\.java/);
 assert.match(dockerfile, /COPY scripts\/otel-smoke\.sh/);
 assert.match(dockerfile, /bash \/tmp\/otel-smoke\.sh/,
   'The release build must run isolated runtime telemetry regressions.');
+assert.match(dockerfile, /RUN EMBEDIFY_OTEL_SMOKE_APP_JAVA=\/opt\/runtime\/bin\/java/,
+  'The isolated smoke must start the app with the actual generated reduced runtime.');
+assert(dockerfile.indexOf('jlink \\') < dockerfile.indexOf('RUN EMBEDIFY_OTEL_SMOKE_APP_JAVA='),
+  'The app runtime must be generated before its telemetry regression runs.');
+assert(smoke.includes('"${EMBEDIFY_OTEL_SMOKE_APP_JAVA:-java}" -javaagent:'),
+  'Fixture-only JDK modules must not be required by the shipped app runtime.');
 for (const path of [
   '/opt/otelcol-contrib',
   '/etc/embedify-otel/collector.yaml',
@@ -80,6 +88,13 @@ for (const attribute of ['server.address', 'server.port', 'network.peer.address'
   assert(metricPolicy.includes(`delete_key(attributes, "${attribute}")`),
     `High-cardinality peer field ${attribute} must not be a metric dimension.`);
 }
+assert.match(metricPolicy, /context: exemplar/,
+  'Metric exemplar filtered attributes need the same targeted privacy policy as datapoints.');
+for (const attribute of ['url.full', 'url.original', 'url.query', 'url.path', 'http.url', 'http.target',
+  'server.address', 'server.port', 'network.peer.address', 'network.peer.port', 'net.peer.name', 'net.peer.ip']) {
+  assert(metricPolicy.includes(`delete_key(exemplar.filtered_attributes, "${attribute}")`),
+    `Metric exemplars must remove sensitive ${attribute} fields without dropping the exemplar.`);
+}
 assert.match(collector, /replace_pattern\(body,/,
   'Log messages must be redacted by targeted URL patterns while retaining their surrounding detail.');
 assert.match(collector, /replace_pattern\(attributes\["exception\.message"\]/);
@@ -98,6 +113,7 @@ for (const evidence of [
   'fixture-redaction-message',
   'http.client.request.duration',
   'http.server.request.duration',
+  'Exemplar #0',
   'SMOKE_QUERY',
   'local-agent-export-failure',
   'connection refused',

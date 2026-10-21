@@ -30,9 +30,23 @@ stop_process() {
 }
 
 cleanup() {
+  local result=$?
   stop_process "$app_pid"
   stop_process "$collector_pid"
   stop_process "$capture_pid"
+  if [[ -n "${EMBEDIFY_OTEL_SMOKE_ARTIFACT_DIR:-}" ]]; then
+    mkdir -p "$EMBEDIFY_OTEL_SMOKE_ARTIFACT_DIR"
+    cp "$work"/*.log "$EMBEDIFY_OTEL_SMOKE_ARTIFACT_DIR/"
+  fi
+  if (( result != 0 )); then
+    local log
+    for log in collector-validate collector capture app fixture failure-fixture local-export-failure; do
+      if [[ -s "$work/$log.log" ]]; then
+        printf 'Isolated telemetry fixture diagnostic: %s\n' "$log" >&2
+        tail -n 40 "$work/$log.log" >&2
+      fi
+    done
+  fi
   rm -rf "$work"
 }
 
@@ -48,6 +62,7 @@ assert_ordered() {
 }
 
 trap cleanup EXIT
+trap 'printf "Isolated telemetry smoke failed at line %s (status %s).\n" "$LINENO" "$?" >&2' ERR
 
 printf '%s' 'fixture-only-not-an-openwoof-key' > "$work/ingest-key"
 export OPENWOOF_INGEST_KEY_FILE="$work/ingest-key"
@@ -62,6 +77,9 @@ exporters:
   debug:
     verbosity: detailed
 service:
+  telemetry:
+    metrics:
+      level: none
   pipelines:
     traces:
       receivers: [otlp]
@@ -102,15 +120,15 @@ wait_for_app_health() {
   local attempt
   local response
   for attempt in {1..60}; do
-    if {
+    if (
       if ! exec 3<>/dev/tcp/127.0.0.1/18080 2>/dev/null; then
-        return 1
+        exit 1
       fi
       printf 'GET /healthz HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' >&3
       IFS= read -r response <&3
       exec 3>&-
       [[ "$response" == 'HTTP/1.1 200'* || "$response" == 'HTTP/1.0 200'* ]]
-    } 2>/dev/null; then
+    ) 2>/dev/null; then
       return 0
     fi
     sleep 0.2
@@ -139,7 +157,7 @@ export OTEL_BLRP_MAX_EXPORT_BATCH_SIZE=32
 export OTEL_SERVICE_NAME=embedify
 export OTEL_RESOURCE_ATTRIBUTES=service.namespace=javadevjt,deployment.environment.name=production,service.version=collector-smoke
 
-java -javaagent:"$java_agent" -jar "$app_jar" --server.address=127.0.0.1 --server.port=18080 > "$work/app.log" 2>&1 &
+"${EMBEDIFY_OTEL_SMOKE_APP_JAVA:-java}" -javaagent:"$java_agent" -jar "$app_jar" --server.address=127.0.0.1 --server.port=18080 > "$work/app.log" 2>&1 &
 app_pid=$!
 wait_for_app_health || { printf '%s\n' 'Instrumented Embedify did not start.' >&2; exit 1; }
 
@@ -168,6 +186,7 @@ grep -E 'Started .*Application' "$work/capture.log" >/dev/null
 grep -F 'service.name: Str(embedify)' "$work/capture.log" >/dev/null
 grep -F 'http.client.request.duration' "$work/capture.log" >/dev/null
 grep -F 'http.server.request.duration' "$work/capture.log" >/dev/null
+grep -F 'Exemplar #0' "$work/capture.log" >/dev/null
 grep -F 'server.address: Str(127.0.0.1)' "$work/capture.log" >/dev/null
 grep -F 'http.response.status_code' "$work/capture.log" >/dev/null
 grep -F '503' "$work/capture.log" >/dev/null
@@ -193,8 +212,13 @@ grep -F 'fixture-export-failure-isolation-local-agent-export-failure' "$work/loc
 grep -Eiq '(error.*export|export.*error|failed.*export|export.*failed|connection refused)' "$work/local-export-failure.log"
 
 kill -TERM "$app_pid"
-wait "$app_pid"
+app_exit=0
+wait "$app_pid" || app_exit=$?
 app_pid=
+if [[ "$app_exit" != 0 && "$app_exit" != 143 ]]; then
+  printf 'Instrumented Embedify exited unexpectedly after SIGTERM: %s\n' "$app_exit" >&2
+  exit 1
+fi
 grep -E 'Started .*Application' "$work/app.log" >/dev/null
 
 printf '%s\n' 'OpenTelemetry isolated smoke passed: original console logs, untraced Logback export, multiline and exception detail, redaction, MVC/Apache HTTP spans and metrics, HTTP success/failure, downstream Collector outage, and direct exporter-failure isolation.'
