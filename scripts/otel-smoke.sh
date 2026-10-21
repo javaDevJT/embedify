@@ -35,9 +35,22 @@ cleanup() {
   stop_process "$capture_pid"
   rm -rf "$work"
 }
+
+assert_ordered() {
+  local file=$1 first=$2 second=$3
+  local first_offset second_offset
+  first_offset=$(grep -b -o -F -m 1 -- "$first" "$file" | cut -d: -f1 || true)
+  second_offset=$(grep -b -o -F -m 1 -- "$second" "$file" | cut -d: -f1 || true)
+  if [[ -z "$first_offset" || -z "$second_offset" ]] || (( 10#$first_offset >= 10#$second_offset )); then
+    printf 'Expected ordered log markers in %s.\n' "$file" >&2
+    return 1
+  fi
+}
+
 trap cleanup EXIT
 
 printf '%s' 'fixture-only-not-an-openwoof-key' > "$work/ingest-key"
+export OPENWOOF_INGEST_KEY_FILE="$work/ingest-key"
 
 cat > "$work/capture.yaml" <<'YAML'
 receivers:
@@ -136,10 +149,22 @@ sleep 5
 grep -F 'fixture-untraced-log-healthy' "$work/fixture.log" >/dev/null
 grep -F 'fixture-multiline-first' "$work/fixture.log" >/dev/null
 grep -F 'fixture-multiline-second' "$work/fixture.log" >/dev/null
+grep -E 'INFO .*fixture-untraced-log-healthy' "$work/fixture.log" >/dev/null
+grep -E 'WARN .*fixture-multiline-first' "$work/fixture.log" >/dev/null
+grep -E 'ERROR .*fixture-redaction-message' "$work/fixture.log" >/dev/null
+grep -F 'https://fixture-user:fixture-pass@calendar.example.test/SMOKE_PATH?token=SMOKE_QUERY' "$work/fixture.log" >/dev/null
 grep -F 'fixture-untraced-log-healthy' "$work/capture.log" >/dev/null
 grep -F 'fixture-multiline-first' "$work/capture.log" >/dev/null
 grep -F 'fixture-multiline-second' "$work/capture.log" >/dev/null
+grep -F 'SeverityText: INFO' "$work/capture.log" >/dev/null
+grep -F 'SeverityText: WARN' "$work/capture.log" >/dev/null
+grep -F 'SeverityText: ERROR' "$work/capture.log" >/dev/null
+assert_ordered "$work/fixture.log" 'fixture-untraced-log-healthy' 'fixture-multiline-first'
+assert_ordered "$work/fixture.log" 'fixture-multiline-first' 'fixture-redaction-message'
+assert_ordered "$work/capture.log" 'fixture-untraced-log-healthy' 'fixture-multiline-first'
+assert_ordered "$work/capture.log" 'fixture-multiline-first' 'fixture-redaction-message'
 grep -F 'fixture-redaction-message https://calendar.example.test/[redacted]' "$work/capture.log" >/dev/null
+grep -E 'Started .*Application' "$work/capture.log" >/dev/null
 grep -F 'service.name: Str(embedify)' "$work/capture.log" >/dev/null
 grep -F 'http.client.request.duration' "$work/capture.log" >/dev/null
 grep -F 'http.server.request.duration' "$work/capture.log" >/dev/null

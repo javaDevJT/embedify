@@ -457,7 +457,7 @@ async function installOpenWoofKey(rpc, apiKey) {
     const stat = await rpc('filesystem.stat', [OPENWOOF_SECRET_PATH]);
     const status = summarizeSecretFile(stat);
     assert(status.ready, 'OpenWoof key file permissions or ownership do not meet the runtime policy.');
-    console.log(JSON.stringify({ app: APP, secret: { ...status, path: OPENWOOF_SECRET_CONTAINER_PATH }, delivery: 'TLS verified, single-use TrueNAS token, read-only Collector mount' }));
+    console.log(JSON.stringify({ app: APP, secret: { ...status, path: OPENWOOF_SECRET_CONTAINER_PATH }, delivery: 'Keychain TrueNAS API credential over TLS-verified upload; read-only Collector mount' }));
   } finally {
     key.fill(0);
   }

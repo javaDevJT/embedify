@@ -20,8 +20,11 @@ ADD --checksum=sha256:f787eb6c7f3d18e69a431e108a15278d25ee37f83d68b678f621e063f3
     https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.32.0/opentelemetry-javaagent.jar \
     /tmp/opentelemetry-javaagent.jar
 
-RUN OPENWOOF_INGEST_KEY_FILE=/run/secrets/openwoof-ingest-key \
-    /tmp/otelcol-contrib validate --config=/tmp/collector.yaml
+RUN set -eu; \
+    printf '%s' 'fixture-only-not-an-openwoof-key' > /tmp/openwoof-test-token; \
+    OPENWOOF_INGEST_KEY_FILE=/tmp/openwoof-test-token \
+      /tmp/otelcol-contrib validate --config=/tmp/collector.yaml; \
+    rm -f /tmp/openwoof-test-token
 
 RUN install -D -m 0644 /etc/ssl/certs/ca-certificates.crt /tmp/ca-certificates.crt
 
