@@ -41,8 +41,7 @@ RUN set -eu; \
     dependency_classpath="$(find /tmp/app/BOOT-INF/lib -maxdepth 1 -type f -name '*.jar' -printf '%p:')"; \
     test -n "$dependency_classpath"; \
     mkdir -p /tmp/otel-smoke; \
-    javac --release 25 -classpath "$dependency_classpath" -d /tmp/otel-smoke /tmp/OtelSmoke.java; \
-    bash /tmp/otel-smoke.sh /tmp/otelcol-contrib /tmp/collector.yaml /tmp/opentelemetry-javaagent.jar /tmp/embedify.jar "/tmp/otel-smoke:/tmp/app/BOOT-INF/lib/*"
+    javac --release 25 -classpath "$dependency_classpath" -d /tmp/otel-smoke /tmp/OtelSmoke.java
 
 RUN set -eu; \
     mkdir -p /opt/healthcheck; \
@@ -56,7 +55,7 @@ RUN set -eu; \
     fi; \
     modules="$(jdeps --multi-release 25 --recursive --ignore-missing-deps --print-module-deps --class-path "$dependency_classpath" /tmp/app/BOOT-INF/classes)"; \
     test -n "$modules"; \
-    modules="${modules},jdk.crypto.ec"; \
+    modules="${modules},jdk.crypto.ec,java.instrument"; \
     printf 'jlink modules: %s\n' "$modules"; \
     jlink \
       --add-modules "$modules" \
@@ -72,6 +71,9 @@ RUN set -eu; \
     printf 'embedify:x:10001:10001:Embedify:/tmp:/sbin/nologin\n' > /tmp/embedify.passwd; \
     printf 'embedify:x:10001:\n' > /tmp/embedify.group; \
     /opt/runtime/bin/java --version
+
+RUN EMBEDIFY_OTEL_SMOKE_APP_JAVA=/opt/runtime/bin/java \
+    bash /tmp/otel-smoke.sh /tmp/otelcol-contrib /tmp/collector.yaml /tmp/opentelemetry-javaagent.jar /tmp/embedify.jar "/tmp/otel-smoke:/tmp/app/BOOT-INF/lib/*"
 
 # Minimal glibc/C++ runtime; retain its package metadata for full-image scanning.
 FROM cgr.dev/chainguard/glibc-dynamic:latest@sha256:82edc253a57efee78d0fb504e11a93b7c74687b1b736110ad3a2a4f3edf632ab

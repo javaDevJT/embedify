@@ -64,6 +64,20 @@ processors:
           - delete_key(attributes, "network.peer.port")
           - delete_key(attributes, "net.peer.name")
           - delete_key(attributes, "net.peer.ip")
+      - context: exemplar
+        statements:
+          - delete_key(exemplar.filtered_attributes, "url.full")
+          - delete_key(exemplar.filtered_attributes, "url.original")
+          - delete_key(exemplar.filtered_attributes, "url.query")
+          - delete_key(exemplar.filtered_attributes, "url.path")
+          - delete_key(exemplar.filtered_attributes, "http.url")
+          - delete_key(exemplar.filtered_attributes, "http.target")
+          - delete_key(exemplar.filtered_attributes, "server.address")
+          - delete_key(exemplar.filtered_attributes, "server.port")
+          - delete_key(exemplar.filtered_attributes, "network.peer.address")
+          - delete_key(exemplar.filtered_attributes, "network.peer.port")
+          - delete_key(exemplar.filtered_attributes, "net.peer.name")
+          - delete_key(exemplar.filtered_attributes, "net.peer.ip")
     log_statements:
       - context: log
         statements:
