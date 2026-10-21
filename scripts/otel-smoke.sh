@@ -31,6 +31,16 @@ stop_process() {
 
 cleanup() {
   local result=$?
+  set +e
+  if (( result != 0 )); then
+    local log
+    for log in capture-validate collector-validate collector capture app fixture failure-fixture local-export-failure; do
+      if [[ -s "$work/$log.log" ]]; then
+        printf 'Isolated telemetry fixture diagnostic: %s\n' "$log" >&2
+        tail -n 40 "$work/$log.log" | tail -c 16000 >&2
+      fi
+    done
+  fi
   stop_process "$app_pid"
   stop_process "$collector_pid"
   stop_process "$capture_pid"
@@ -38,16 +48,8 @@ cleanup() {
     mkdir -p "$EMBEDIFY_OTEL_SMOKE_ARTIFACT_DIR"
     cp "$work"/*.log "$EMBEDIFY_OTEL_SMOKE_ARTIFACT_DIR/"
   fi
-  if (( result != 0 )); then
-    local log
-    for log in collector-validate collector capture app fixture failure-fixture local-export-failure; do
-      if [[ -s "$work/$log.log" ]]; then
-        printf 'Isolated telemetry fixture diagnostic: %s\n' "$log" >&2
-        tail -n 40 "$work/$log.log" >&2
-      fi
-    done
-  fi
   rm -rf "$work"
+  return "$result"
 }
 
 assert_ordered() {
@@ -149,6 +151,44 @@ wait_for_app_health() {
   return 1
 }
 
+wait_for_capture() {
+  local marker ready
+  local deadline=$((SECONDS + 30))
+  local markers=(
+    'fixture-untraced-log-healthy'
+    'fixture-multiline-first'
+    'fixture-multiline-second'
+    'SeverityText: INFO'
+    'SeverityText: WARN'
+    'SeverityText: ERROR'
+    'fixture-redaction-message https://calendar.example.test/[redacted]'
+    'java.lang.IllegalStateException'
+    'Started EmbedifyApplication'
+    'service.name: Str(embedify)'
+    'http.client.request.duration'
+    'http.server.request.duration'
+    'Exemplar #0'
+    'server.address: Str(127.0.0.1)'
+    'http.response.status_code'
+    '503'
+  )
+  while (( SECONDS < deadline )); do
+    ready=true
+    for marker in "${markers[@]}"; do
+      if ! grep -Fq -- "$marker" "$work/capture.log"; then
+        ready=false
+        break
+      fi
+    done
+    if [[ "$ready" == true ]]; then
+      return 0
+    fi
+    sleep 0.2
+  done
+  printf '%s\n' 'Required telemetry did not reach the capture within 30 seconds.' >&2
+  return 1
+}
+
 wait_for_port 14318 || { printf '%s\n' 'Collector receiver did not start.' >&2; exit 1; }
 wait_for_port 14319 || { printf '%s\n' 'Capture receiver did not start.' >&2; exit 1; }
 
@@ -175,7 +215,6 @@ app_pid=$!
 wait_for_app_health || { printf '%s\n' 'Instrumented Embedify did not start.' >&2; exit 1; }
 
 java -javaagent:"$java_agent" -cp "$fixture_classpath" OtelSmoke healthy > "$work/fixture.log" 2>&1
-sleep 5
 
 grep -F 'fixture-untraced-log-healthy' "$work/fixture.log" >/dev/null
 grep -F 'fixture-multiline-first' "$work/fixture.log" >/dev/null
@@ -184,6 +223,7 @@ grep -E 'INFO .*fixture-untraced-log-healthy' "$work/fixture.log" >/dev/null
 grep -E 'WARN .*fixture-multiline-first' "$work/fixture.log" >/dev/null
 grep -E 'ERROR .*fixture-redaction-message' "$work/fixture.log" >/dev/null
 grep -F 'https://fixture-user:fixture-pass@calendar.example.test/SMOKE_PATH?token=SMOKE_QUERY' "$work/fixture.log" >/dev/null
+wait_for_capture
 grep -F 'fixture-untraced-log-healthy' "$work/capture.log" >/dev/null
 grep -F 'fixture-multiline-first' "$work/capture.log" >/dev/null
 grep -F 'fixture-multiline-second' "$work/capture.log" >/dev/null
