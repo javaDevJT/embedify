@@ -97,6 +97,19 @@ sed \
   -e 's|endpoint: https://openwoof.javadevjt.tech|endpoint: http://127.0.0.1:14319|' \
   "$production_config" > "$work/collector.yaml"
 
+if ! awk '
+  /^exporters:$/ { in_exporters = 1; next }
+  in_exporters && /^[^[:space:]]/ { in_exporters = 0 }
+  in_exporters && /^[[:space:]]+[[:alnum:]_]*endpoints?:/ {
+    if ($0 != "    endpoint: http://127.0.0.1:14319") exit 1
+    endpoint_count++
+  }
+  END { if (endpoint_count != 1) exit 1 }
+' "$work/collector.yaml"; then
+  printf '%s\n' 'Isolated smoke refuses an unexpected or non-loopback exporter endpoint.' >&2
+  exit 1
+fi
+
 "$collector_bin" validate --config="$work/capture.yaml" > "$work/capture-validate.log" 2>&1
 "$collector_bin" validate --config="$work/collector.yaml" > "$work/collector-validate.log" 2>&1
 "$collector_bin" --config="$work/capture.yaml" > "$work/capture.log" 2>&1 &
