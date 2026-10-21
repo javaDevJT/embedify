@@ -8,21 +8,49 @@ import https from 'node:https';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dir, '..');
 const APP = 'embedify';
-const TRUENAS = '192.168.0.2:8443';
 const HOST_PORT = 30024;
 const CONTAINER_PORT = 8080;
 const COLLECTOR = 'otel-collector';
 const IMAGE_REPOSITORY = 'ghcr.io/javadevjt/embedify';
-const PROXY_NETWORK = 'ix-nginx-proxy-manager_default';
-const OPENWOOF_SECRET_DIRECTORY = '/mnt/.ix-apps/app_mounts/embedify-observability';
-const OPENWOOF_SECRET_PATH = `${OPENWOOF_SECRET_DIRECTORY}/openwoof-ingest-key`;
 const OPENWOOF_SECRET_CONTAINER_PATH = '/run/secrets/openwoof-ingest-key';
 const APP_TMPFS = '/tmp:rw,noexec,nosuid,nodev,size=16m,uid=10001,gid=10001,mode=1777';
 const CONTROL_CA = resolve(import.meta.dir, 'truenas-control-plane.pem');
+
+function readOperatorValues() {
+  let dotenv = '';
+  try { dotenv = readFileSync(resolve(ROOT, '.env'), 'utf8'); } catch (error) {
+    if (error?.code !== 'ENOENT') throw new Error('Could not read the ignored operator environment file.');
+  }
+  return { ...parseDotEnv(dotenv), ...process.env };
+}
+
+const OPERATOR_VALUES = readOperatorValues();
+const EMBEDIFY_BIND_ADDRESS = OPERATOR_VALUES.EMBEDIFY_BIND_ADDRESS?.trim() || '127.0.0.1';
+const TRUENAS = OPERATOR_VALUES.TRUENAS_ADDRESS?.trim() || `${EMBEDIFY_BIND_ADDRESS}:8443`;
+const PROXY_NETWORK = OPERATOR_VALUES.EMBEDIFY_PROXY_NETWORK?.trim() || 'embedify-test-proxy';
+const OPENWOOF_SECRET_PATH = OPERATOR_VALUES.OPENWOOF_INGEST_KEY_PATH?.trim()
+  || '/tmp/embedify-test/openwoof-ingest-key';
+const OPENWOOF_SECRET_DIRECTORY = dirname(OPENWOOF_SECRET_PATH);
+const TRUENAS_KEYCHAIN_ACCOUNT = OPERATOR_VALUES.TRUENAS_KEYCHAIN_ACCOUNT?.trim() || basename(homedir());
+const TRUENAS_KEYCHAIN_SERVICE = OPERATOR_VALUES.TRUENAS_KEYCHAIN_SERVICE?.trim() || '';
+
+function assertOperatorConfiguration() {
+  for (const name of ['EMBEDIFY_BIND_ADDRESS', 'EMBEDIFY_PROXY_NETWORK', 'OPENWOOF_INGEST_KEY_PATH']) {
+    assert(OPERATOR_VALUES[name]?.trim(), `Set ${name} in the ignored .env file before using the TrueNAS helper.`);
+  }
+  assert(OPENWOOF_SECRET_PATH.startsWith('/') && resolve(OPENWOOF_SECRET_PATH) === OPENWOOF_SECRET_PATH,
+    'OPENWOOF_INGEST_KEY_PATH must be a normalized absolute path.');
+  const endpoint = new URL(`https://${TRUENAS}`);
+  assert(endpoint.hostname && endpoint.port && endpoint.pathname === '/' && !endpoint.username && !endpoint.password
+    && !endpoint.search && !endpoint.hash, 'TRUENAS_ADDRESS must be a host and port only.');
+  assert(TRUENAS_KEYCHAIN_ACCOUNT && TRUENAS_KEYCHAIN_SERVICE,
+    'The local TrueNAS Keychain account and service must be configured.');
+  return endpoint;
+}
 const RPC_METHODS = new Set([
   'auth.login_with_api_key', 'app.query', 'app.used_ports', 'docker.status', 'docker.network.query', 'app.create', 'app.config', 'app.update', 'core.get_jobs', 'core.subscribe', 'core.unsubscribe',
   'filesystem.stat', 'filesystem.mkdir', 'filesystem.chown',
@@ -70,7 +98,7 @@ function validateLegacyCompose(config) {
   assert.deepEqual(service.tmpfs, [APP_TMPFS], 'Existing app temporary filesystem must be preserved.');
   assert.equal(service.ports?.length, 1, 'Existing Embedify must expose only its configured service port.');
   const [port] = service.ports;
-  assert.equal(port.host_ip, '192.168.0.2', 'Embedify must bind only on the TrueNAS LAN address.');
+  assert.equal(port.host_ip, EMBEDIFY_BIND_ADDRESS, 'Embedify must bind only on its configured TrueNAS address.');
   assert.equal(String(port.published), String(HOST_PORT), 'Embedify must use host port 30024.');
   assert.equal(Number(port.target), CONTAINER_PORT, 'Embedify must target container port 8080.');
   assert.equal(port.protocol ?? 'tcp', 'tcp', 'Embedify must expose only TCP.');
@@ -81,7 +109,7 @@ function validateLegacyCompose(config) {
   assert.deepEqual(service.tmpfs, [APP_TMPFS]);
   assert.deepEqual(Object.keys(service.networks ?? {}).sort(), ['proxy']);
   assert.equal(config.networks?.proxy?.external, true, 'Existing NPM network must be external.');
-  assert.equal(config.networks?.proxy?.name, PROXY_NETWORK, 'Existing Embedify must use the exact NPM network.');
+  assert.equal(config.networks?.proxy?.name, PROXY_NETWORK, 'Existing Embedify must use the configured NPM network.');
   return config;
 }
 
@@ -95,7 +123,7 @@ function validateCompose(config) {
   assert(!(app.volumes?.length), 'Embedify must not mount host or persistent volumes.');
   assert.equal(app.ports?.length, 1, 'Embedify must expose only its configured service port.');
   const [port] = app.ports;
-  assert.equal(port.host_ip, '192.168.0.2', 'Embedify must bind only on the TrueNAS LAN address.');
+  assert.equal(port.host_ip, EMBEDIFY_BIND_ADDRESS, 'Embedify must bind only on its configured TrueNAS address.');
   assert.equal(String(port.published), String(HOST_PORT), 'Embedify must use host port 30024.');
   assert.equal(Number(port.target), CONTAINER_PORT, 'Embedify must target container port 8080.');
   assert.equal(port.protocol ?? 'tcp', 'tcp', 'Embedify must expose only TCP.');
@@ -105,7 +133,7 @@ function validateCompose(config) {
   assert.deepEqual(Object.keys(app.networks ?? {}).sort(), ['proxy', 'telemetry']);
   assert.deepEqual(Object.keys(collector.networks ?? {}).sort(), ['telemetry'], 'Collector must not join the NPM proxy network.');
   assert.equal(config.networks?.proxy?.external, true, 'NPM network must remain external.');
-  assert.equal(config.networks?.proxy?.name, PROXY_NETWORK, 'Embedify must use the exact NPM network.');
+  assert.equal(config.networks?.proxy?.name, PROXY_NETWORK, 'Embedify must use the configured NPM network.');
   assert(!config.networks?.telemetry?.external && !config.networks?.telemetry?.internal,
     'Telemetry network must be private to the Compose project and allow Collector egress.');
   assert(!collector.depends_on && !app.depends_on, 'Collector availability must not gate app startup.');
@@ -195,10 +223,11 @@ function controlTls() {
 }
 
 async function connectTrueNAS() {
+  const endpoint = assertOperatorConfiguration();
   let apiKey;
   try {
     apiKey = execFileSync('/usr/bin/security', [
-      'find-generic-password', '-a', 'joshuaterk', '-s', 'codex-truenas-mcp', '-w',
+      'find-generic-password', '-a', TRUENAS_KEYCHAIN_ACCOUNT, '-s', TRUENAS_KEYCHAIN_SERVICE, '-w',
       resolve(homedir(), 'Library/Keychains/login.keychain-db'),
     ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   } catch {
@@ -206,7 +235,7 @@ async function connectTrueNAS() {
   }
   assert(apiKey, 'The existing TrueNAS API credential is empty.');
 
-  const ws = new WebSocket(`wss://${TRUENAS}/api/current`, { tls: controlTls() });
+  const ws = new WebSocket(`wss://${endpoint.host}/api/current`, { tls: controlTls() });
   const pending = new Map();
   const notificationHandlers = new Set();
   let sequence = 0;
@@ -314,12 +343,9 @@ function summarizeSecretFile(stat) {
 }
 
 async function inspectSecretPath(rpc) {
-  const base = await rpc('filesystem.stat', ['/mnt/.ix-apps/app_mounts']);
-  assert.equal(base.type, 'DIRECTORY', 'TrueNAS app_mounts path is not a directory.');
-  assert.equal(base.realpath, '/mnt/.ix-apps/app_mounts', 'TrueNAS app_mounts path resolves unexpectedly.');
   const directory = await statIfPresent(rpc, OPENWOOF_SECRET_DIRECTORY);
   const file = directory?.type === 'DIRECTORY' ? await statIfPresent(rpc, OPENWOOF_SECRET_PATH) : null;
-  return { base, directory, file };
+  return { directory, file };
 }
 
 async function waitChownJob(rpc, path) {
@@ -373,6 +399,7 @@ async function readStdinSecret() {
 }
 
 function postTrueNASUpload(apiKey, fileBytes, boundary, includeFile = true) {
+  const endpoint = assertOperatorConfiguration();
   const data = JSON.stringify({ method: 'filesystem.put', params: [OPENWOOF_SECRET_PATH, { append: false, mode: 0o400 }] });
   const parts = [
     Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="data"\r\nContent-Type: application/json\r\n\r\n${data}\r\n`),
@@ -387,8 +414,8 @@ function postTrueNASUpload(apiKey, fileBytes, boundary, includeFile = true) {
 
   return new Promise((resolveResult, rejectResult) => {
     const request = https.request({
-      hostname: TRUENAS.split(':')[0],
-      port: Number(TRUENAS.split(':')[1]),
+      hostname: endpoint.hostname,
+      port: Number(endpoint.port),
       path: '/_upload/',
       method: 'POST',
       servername: 'localhost',
@@ -659,7 +686,7 @@ function selfTest() {
     user: '10001:10001',
     cap_drop: ['ALL'],
     security_opt: ['no-new-privileges:true'],
-    ports: [{ host_ip: '192.168.0.2', published: String(HOST_PORT), target: CONTAINER_PORT, protocol: 'tcp' }],
+    ports: [{ host_ip: EMBEDIFY_BIND_ADDRESS, published: String(HOST_PORT), target: CONTAINER_PORT, protocol: 'tcp' }],
     networks: { proxy: null, telemetry: null },
     mem_limit: '512m',
     cpus: 1,
@@ -708,7 +735,7 @@ function selfTest() {
       [APP]: {
         ...structuredClone(appService),
         networks: { proxy: null },
-        environment: { EMBEDIFY_TRUSTED_PROXIES: '192.168.9.0/24' },
+    environment: { EMBEDIFY_TRUSTED_PROXIES: '203.0.113.0/24' },
       },
     },
     networks: { proxy: { external: true, name: PROXY_NETWORK } },
@@ -746,8 +773,8 @@ function selfTest() {
   assert.throws(() => validateCompose(leakedHeaders));
   assert.deepEqual(summarizeProxyNetwork({
     name: PROXY_NETWORK,
-    ipam: { config: [{ Subnet: '192.168.9.0/24', Gateway: '192.168.9.1' }] },
-  }), { name: PROXY_NETWORK, subnets: ['192.168.9.0/24'] });
+    ipam: { config: [{ Subnet: '198.51.100.0/24', Gateway: '198.51.100.1' }] },
+  }), { name: PROXY_NETWORK, subnets: ['198.51.100.0/24'] });
   assert.throws(() => summarizeProxyNetwork({ name: 'unexpected-network', ipam: { config: [] } }));
   const summary = summarizeCompose({
     services: { embedify: { image: 'private@sha256:abc', environment: { OTEL_HEADERS: 'secret-value' },
@@ -779,8 +806,17 @@ function connectProxyNetwork(config) {
 
 async function main() {
   const mode = process.argv[2];
-  assert(['inspect', 'compose-summary', 'capture-baseline-logs', 'capture-after-logs', 'create', 'update-image', 'update-observability', 'use-proxy-network', 'proxy-network', 'secret-status', 'prepare-openwoof-secret', 'verify-upload-auth', 'install-openwoof-key', 'self-test'].includes(mode), 'Usage: truenas.mjs inspect|compose-summary|capture-baseline-logs|capture-after-logs|create|update-image|update-observability|proxy-network|secret-status|prepare-openwoof-secret|verify-upload-auth|install-openwoof-key|self-test');
   if (mode === 'self-test') return selfTest();
+  const endpoint = assertOperatorConfiguration();
+  if (mode === 'keychain-identity') {
+    console.log(JSON.stringify({
+      service: `openwoof/openwoof.javadevjt.tech/truenas-${endpoint.hostname}/embedify/production`,
+      account: 'embedify',
+      target: endpoint.hostname,
+    }));
+    return;
+  }
+  assert(['inspect', 'compose-summary', 'capture-baseline-logs', 'capture-after-logs', 'create', 'update-image', 'update-observability', 'use-proxy-network', 'proxy-network', 'secret-status', 'prepare-openwoof-secret', 'verify-upload-auth', 'install-openwoof-key'].includes(mode), 'Usage: truenas.mjs inspect|compose-summary|capture-baseline-logs|capture-after-logs|create|update-image|update-observability|proxy-network|secret-status|prepare-openwoof-secret|verify-upload-auth|install-openwoof-key|keychain-identity|self-test');
   if (mode === 'compose-summary') {
     console.log(JSON.stringify(summarizeCompose(readCompose()), null, 2));
     return;

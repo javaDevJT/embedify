@@ -1,11 +1,27 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const dockerfile = read('Dockerfile');
 const compose = read('compose.yaml');
 const collector = read('deploy/otel/collector.yaml');
 const smoke = read('scripts/otel-smoke.sh');
+const keyPrompt = read('scripts/PromptOpenWoofKey.js');
+const truenas = read('scripts/truenas.mjs');
+const envExample = read('.env.example');
+assert(!existsSync(new URL('../scripts/PromptOpenWoofKey.swift', import.meta.url)),
+  'The removed Swift key prompt must not return to the repository.');
+assert.match(compose, /host_ip: "\$\{EMBEDIFY_BIND_ADDRESS:\?/);
+assert.match(compose, /name: \$\{EMBEDIFY_PROXY_NETWORK:\?/);
+assert.match(compose, /source: \$\{OPENWOOF_INGEST_KEY_PATH:\?/);
+assert.match(envExample, /^EMBEDIFY_BIND_ADDRESS=$/m);
+assert.match(envExample, /^EMBEDIFY_PROXY_NETWORK=$/m);
+assert.match(envExample, /^OPENWOOF_INGEST_KEY_PATH=$/m);
+assert.match(truenas, /keychain-identity/,
+  'The operator-side prompt must derive its target from local ignored configuration.');
+assert.doesNotMatch(`${compose}\n${envExample}\n${truenas}\n${keyPrompt}`,
+  /\b192\.168\.\d{1,3}\.\d{1,3}\b|\/mnt\//,
+  'Public deployment sources must not expose machine-specific hosts or host mount paths.');
 
 assert.match(dockerfile, /^FROM otel\/opentelemetry-collector-contrib:0\.163\.2@sha256:[a-f0-9]{64} AS collector$/m,
   'Collector build input must be version and digest pinned.');
@@ -86,5 +102,30 @@ for (const evidence of [
   'local-agent-export-failure',
   'connection refused',
 ]) assert(smoke.includes(evidence), `The isolated smoke test must cover ${evidence}.`);
+
+assert.match(keyPrompt, /hiddenAnswer: true/,
+  'The OpenWoof key must be entered only through a secure hidden field.');
+assert.match(keyPrompt, /--store-keychain/);
+assert.match(keyPrompt, /--install-keychain/);
+assert.doesNotMatch(keyPrompt, /" -U"|Replace and Install/,
+  'The credential helper must preserve existing keys rather than providing an implicit rotation path.');
+assert.match(keyPrompt, /throw new Error\("OpenWoof key setup stopped;/,
+  'Credential failures must use a fixed nonsecret error and a failing process exit.');
+assert.match(keyPrompt, /task\.setStandardInput\(input\)/,
+  'Secret handoff to child processes must use a private stdin pipe.');
+assert.match(keyPrompt, /task\.setStandardOutput\(output\)/);
+assert.match(keyPrompt, /task\.setStandardError\(errorOutput\)/);
+assert.match(keyPrompt, /SecItemAdd\(/,
+  'New Keychain entries must be created through the native API.');
+assert.match(keyPrompt, /SecItemCopyMatching\(/,
+  'Keychain reads must address the exact item through the native API.');
+assert.doesNotMatch(keyPrompt, /find-generic-password|SecItemUpdate|SecItemDelete/,
+  'The ingest helper must not retrieve credentials through subprocess output or change existing entries.');
+assert.match(keyPrompt, /install-openwoof-key[\s\S]*?keyBytes/,
+  'The retrieved key must be forwarded to TrueNAS only through process stdin.');
+assert.doesNotMatch(keyPrompt, /console\.log|console\.write|print\(/,
+  'The osascript helper must not print or log the key.');
+assert.match(keyPrompt, /return "[^"]*(?:status|installed|cancelled|preserved|stopped)[^"]*"/i,
+  'The osascript result must be nonsecret status only.');
 
 console.log('OpenTelemetry build, network, credential, and privacy policy checks passed.');

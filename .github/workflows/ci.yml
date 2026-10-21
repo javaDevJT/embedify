@@ -190,4 +190,3 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 .github/scripts/cleanup-actions-artifacts.py --current
-

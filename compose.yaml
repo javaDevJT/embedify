@@ -31,7 +31,7 @@ services:
     ports:
       - target: 8080
         published: "${EMBEDIFY_PORT:-30024}"
-        host_ip: "${EMBEDIFY_BIND_ADDRESS:-192.168.0.2}"
+        host_ip: "${EMBEDIFY_BIND_ADDRESS:?Set EMBEDIFY_BIND_ADDRESS in the ignored .env file}"
         protocol: tcp
     read_only: true
     cap_drop:
@@ -77,5 +77,5 @@ services:
 networks:
   proxy:
     external: true
-    name: ix-nginx-proxy-manager_default
+    name: ${EMBEDIFY_PROXY_NETWORK:?Set EMBEDIFY_PROXY_NETWORK in the ignored .env file}
   telemetry: {}

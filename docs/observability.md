@@ -1,6 +1,6 @@
 # Production observability
 
-Embedify sends application logs, traces, and metrics through an app-scoped OpenTelemetry Collector on TrueNAS to `https://openwoof.javadevjt.tech` using OTLP HTTP/protobuf. The Collector is not published on a host port and does not join the Nginx Proxy Manager network. Its only credential is mounted read-only from the protected TrueNAS app directory.
+Embedify sends application logs, traces, and metrics through an app-scoped OpenTelemetry Collector on TrueNAS to `https://openwoof.javadevjt.tech` using OTLP HTTP/protobuf. The Collector is not published on a host port and does not join the Nginx Proxy Manager network. Its only credential is mounted read-only from an operator-configured protected path.
 
 ## Coverage and release state
 
@@ -14,11 +14,13 @@ This document describes the implementation being qualified. It does not claim pr
 | Outbound HTTP | Java agent instrumentation of the app's Apache HttpClient 5 calls in `SafeFetcher` | Source configured; real successful and failed peer operations pending |
 | Application metrics | Java agent HTTP/JVM instruments, when emitted by the actual runtime | Source configured; metric kind, unit, temporality, and persisted observations pending |
 | Collector privacy and transport | Collector build validates the production config; TLS verification remains enabled | CI qualification pending |
-| Key custody and delivery | Exact service-specific macOS Keychain item and read-only TrueNAS file | No OpenWoof key has been installed |
+| Key custody and delivery | Exact service-specific macOS Keychain item and protected TrueNAS file | Installed directly; metadata verified on October 21, 2026 at 20:47:58 UTC: UID/GID 10001, mode 0400, no widening ACL; runtime mount pending release |
 | OpenWoof storage/readback | Persisted signal inspection through the owner's authenticated UI | Pending an installed key, deployment, and owner-session readback |
 | Other protocols/jobs | No database, queue, mail, scheduled job, or subprocess hook has been established | Unexercised; do not infer coverage from process duration or HTTP spans |
 
 The current public production image remains unchanged until the source passes CI and its immutable digest is deliberately deployed.
+
+Local qualification on October 21 passed all 34 Maven tests, URL/UI checks, CI trust policy checks, telemetry policy checks, the TrueNAS helper self-test, and the Mac secure-field/native-query/private-stdin self-test. Independent source review accepted the separate local storage and direct delivery paths. These checks do not establish container startup, upstream authorization, or persisted OpenWoof export; those remain release checks below.
 
 ## Signal and network path
 
@@ -40,23 +42,16 @@ Collector transform errors use `error_mode: propagate`, while its bounded export
 
 ## Credential workflow
 
-The deterministic macOS Keychain service is `openwoof/openwoof.javadevjt.tech/truenas-192.168.0.2/embedify/production`, with account `embedify`. Use an OpenWoof ingest key with `collector:write`, `traces:write`, `metrics:write`, and `logs:write`. It is an ingestion-only, collector-wide credential: the Keychain name does not restrict which service can use it, and it grants no UI, query, or administrative access. A finite expiry is preferred; select Never only intentionally, and keep that key revocable. Do not create the key through this repository or paste it into chat.
+The OpenWoof ingest credential is operator-provisioned and stays outside source control, GitHub Actions, Compose text, and repository environment files. The runtime receives only the configured secret-file path; the app container never receives the credential. Use a collector-wide ingestion key with only the required write grants, prefer a finite expiry, and keep it revocable. Do not create the key through this repository or paste it into chat.
 
-After CI qualification, run `swift scripts/PromptOpenWoofKey.swift` on the operator Mac. The native secure text field is used instead of returning hidden dialog text through `osascript`; the helper stores/retrieves only the exact Keychain item and sends the value through private process memory/stdin over verified TLS to the protected TrueNAS file. It prints only nonsecret status. The file is owner/group 10001, mode 0400, has no widening ACL, is mounted read-only into the Collector, and is never placed in Compose source or `.env`.
-
-The app-specific TrueNAS commands are intentionally narrow:
+Run the operator helper from the repository root in two separately scoped steps:
 
 ```sh
-bun scripts/truenas.mjs secret-status
-bun scripts/truenas.mjs capture-baseline-logs
-bun scripts/truenas.mjs prepare-openwoof-secret --confirm embedify
-swift scripts/PromptOpenWoofKey.swift
-bun scripts/truenas.mjs update-observability --confirm embedify
-bun scripts/truenas.mjs inspect
-bun scripts/truenas.mjs capture-after-logs
+osascript -l JavaScript scripts/PromptOpenWoofKey.js --store-keychain
+osascript -l JavaScript scripts/PromptOpenWoofKey.js --install-keychain
 ```
 
-The secret directory is created only after the existing app and upload path have been verified. The deploy helper accepts only the reviewed Embedify migration and preserves the existing trusted proxy setting. Do not use these commands to replace an unexpected file or unrelated TrueNAS configuration.
+The first step opens the standard macOS hidden-answer dialog and saves a new exact app-specific entry through the native Keychain API. It makes no network requests, preserves an existing entry without reading its value, and never replaces credentials. The second step checks the configured TrueNAS target and protected file, retrieves the existing Keychain item into private memory through the native API, and sends it through a private process pipe over verified TLS. An existing protected NAS file is preserved. Both steps return only nonsecret status; failures exit unsuccessfully with a fixed message. Running without a mode only prints usage. `--keychain-status` checks only the exact entry's existence. The nonsecret `--self-test` checks secure-field construction, native query construction, private process-stdin handoff, and configured target identity without accessing or changing Keychain entries. Child processes use the fixed operator-home Bun executable and a minimal environment.
 
 Baseline and post-deployment container-log captures use separate write-once files. The post-deployment evidence redacts URL userinfo/path/query/fragment data, Bearer values, and common token/password assignments before writing the ignored mode-0600 artifact; it never prints raw log bodies to the terminal.
 
