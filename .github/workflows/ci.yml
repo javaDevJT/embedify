@@ -19,7 +19,7 @@ jobs:
   verify:
     name: Build and test
     # Evaluated from the trusted base workflow before allocating a runner.
-    if: github.ref == 'refs/heads/main' && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.repository == 'javaDevJT/embedify' && github.ref == 'refs/heads/main' && (github.event_name != 'pull_request_target' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.actor == 'javaDevJT' && github.event.pull_request.user.login == 'javaDevJT') || (github.actor == 'quarterback-ci[bot]' && github.event.pull_request.user.id == 341165314) || (github.actor == 'dependabot[bot]' && github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.user.id == 49699333))))
     runs-on: truenas-embedify-storage-8g
     steps:
       - name: Prepare disk dependency cache
@@ -118,6 +118,7 @@ jobs:
           # Fresh release builds have a consistent footprint for the strict storage gate.
           no-cache: true
           context: .
+          build-args: QB_SOURCE_COMMIT=${{ github.sha }}
           push: false # Push-by-digest is configured in the exporter; tags follow the scan.
           tags: ${{ steps.container_security_1.outputs.repository }}
           labels: |
@@ -154,11 +155,27 @@ jobs:
           if-no-files-found: error
           retention-days: 1
       - name: Publish release tags only after the vulnerability gate passes
+        id: publish_release_tags
         shell: bash
         env:
           SECURITY_IMAGE: ${{ steps.container_security_1.outputs.repository }}@${{ steps.build.outputs.digest }}
           SECURITY_REPORT_DIRECTORY: ${{ runner.temp }}/container-security/build-1
         run: bash .github/actions/container-security/container-security.sh publish
+      - name: Emit verified build receipt marker
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          printf 'QB_BUILD_RECEIPT_V1 source_sha=%s run_id=%s run_attempt=%s digest=%s\n' \
+            "$SOURCE_SHA" "$RUN_ID" "$RUN_ATTEMPT" "$IMAGE_DIGEST"
       - name: Record immutable image reference
         env:
           IMAGE: ${{ steps.image.outputs.name }}
