@@ -28,6 +28,7 @@ class ApiStartupSmokeTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ok"))
                 .andExpect(jsonPath("$.version").value("0.1.0"))
+                .andExpect(jsonPath("$.sourceCommit").value("unknown"))
                 .andExpect(header().string("Cache-Control", containsString("no-store")))
                 .andExpect(header().string("Referrer-Policy", "no-referrer"));
 

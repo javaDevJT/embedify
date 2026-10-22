@@ -35,11 +35,12 @@ const guard = (job, block) => {
 const verify = guard('verify', verifyJob);
 const publish = guard('publish', publishJob);
 const cleanup = guard('cleanup-artifacts', cleanupJob);
-const context = (event, head = 'javaDevJT/embedify', ref = 'refs/heads/main') => ({
+const context = (event, head = 'javaDevJT/embedify', ref = 'refs/heads/main', identity = { actor: 'javaDevJT', login: 'javaDevJT', id: 1 }) => ({
   event_name: event,
   ref,
   repository: 'javaDevJT/embedify',
-  event: { pull_request: { head: { repo: { full_name: head }, sha: 'trusted-head' } } },
+  actor: identity.actor,
+  event: { pull_request: { head: { repo: { full_name: head }, sha: 'trusted-head' }, user: { login: identity.login, id: identity.id } } },
 });
 
 // Exercise the workflow expressions, including the cleanup finalizer, for both
@@ -62,6 +63,21 @@ for (const event of ['pull_request', 'pull_request_target']) {
     assert.equal(verify(sameRepository), true, 'Same-repository pull_request_target events may run source checks');
   }
 }
+const dependabot = { actor: 'dependabot[bot]', login: 'dependabot[bot]', id: 49699333 };
+for (const identity of [dependabot, { actor: 'quarterback-ci[bot]', login: 'quarterback-ci[bot]', id: 341165314 }]) {
+  const trusted = context('pull_request_target', undefined, undefined, identity);
+  assert.equal(verify(trusted), true, 'Verified same-repository automation may run read-only source checks');
+  assert.equal(publish(trusted), false, 'Bot PR validation must not receive publication authority');
+}
+for (const identity of [
+  { ...dependabot, id: 49699334 },
+  { ...dependabot, login: 'other-user' },
+  { ...dependabot, actor: 'unapproved-user' },
+]) {
+  assert.equal(verify(context('pull_request_target', undefined, undefined, identity)), false,
+    'Actor and author identity mismatches must not allocate a validation runner');
+}
+assert.equal(verify(context('pull_request_target', 'outsider/embedify', undefined, dependabot)), false);
 for (const event of ['push', 'workflow_dispatch', 'schedule']) {
   assert.equal(verify(context(event)), true);
   assert.equal(publish(context(event)), true);

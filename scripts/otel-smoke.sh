@@ -7,6 +7,11 @@ production_config=$2
 java_agent=$3
 app_jar=$4
 fixture_classpath=$5
+# BuildKit supplies OTLP settings for its own tracing, including Unix sockets.
+# Use only explicitly configured OTLP endpoints and credentials for fixtures.
+for inherited_otlp_setting in "${!OTEL_EXPORTER_OTLP_@}"; do
+  unset "$inherited_otlp_setting"
+done
 work=$(mktemp -d /tmp/embedify-otel-smoke.XXXXXX)
 capture_pid=
 collector_pid=
