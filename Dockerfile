@@ -88,13 +88,17 @@ COPY --from=build /tmp/embedify.passwd /etc/passwd
 COPY --from=build /tmp/embedify.group /etc/group
 COPY --from=build --chown=10001:10001 /opt/runtime/ /opt/runtime/
 COPY --from=build --chown=10001:10001 /tmp/embedify.jar /app/embedify.jar
-COPY --from=build --chown=0:0 /tmp/opentelemetry-javaagent.jar /opt/opentelemetry-javaagent.jar
+COPY --from=build --chown=0:0 --chmod=0444 /tmp/opentelemetry-javaagent.jar /opt/opentelemetry-javaagent.jar
 COPY --from=build --chown=0:0 /tmp/otelcol-contrib /opt/otelcol-contrib
 COPY --from=build --chown=0:0 /tmp/collector.yaml /etc/embedify-otel/collector.yaml
 COPY --from=build --chown=0:0 /tmp/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build --chown=0:0 /opt/healthcheck/ /opt/healthcheck/
 
 USER 10001:10001
+
+# Remote ADD inputs can carry owner-only permissions; prove the final-copy agent loads as the app user.
+RUN --network=none ["/opt/runtime/bin/java", "-javaagent:/opt/opentelemetry-javaagent.jar", "-version"]
+
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=4s --start-period=45s --retries=3 CMD ["/opt/runtime/bin/java", "-cp", "/opt/healthcheck", "ContainerHealthCheck"]
