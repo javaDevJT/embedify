@@ -6,6 +6,7 @@ const dockerfile = read('Dockerfile');
 const compose = read('compose.yaml');
 const collector = read('deploy/otel/collector.yaml');
 const smoke = read('scripts/otel-smoke.sh');
+const finalImageSmoke = read('scripts/final-image-agent-smoke.sh');
 const keyPrompt = read('scripts/PromptOpenWoofKey.js');
 const truenas = read('scripts/truenas.mjs');
 const envExample = read('.env.example');
@@ -29,6 +30,33 @@ assert.match(dockerfile, /ADD --checksum=sha256:[a-f0-9]{64}[\s\\\n]*https:\/\/g
   'Java agent must be downloaded from the official release with a pinned checksum.');
 assert.match(dockerfile, /ENTRYPOINT \["\/opt\/runtime\/bin\/java", "-javaagent:\/opt\/opentelemetry-javaagent\.jar"/,
   'The application must start with the pinned Java agent.');
+const agentCopy = 'COPY --from=build --chown=0:0 --chmod=0444 /tmp/opentelemetry-javaagent.jar /opt/opentelemetry-javaagent.jar';
+const finalAgentProbe = 'RUN --network=none ["/opt/runtime/bin/java", "-javaagent:/opt/opentelemetry-javaagent.jar", "-version"]';
+const agentCopyIndex = dockerfile.indexOf(agentCopy);
+const userIndex = dockerfile.indexOf('USER 10001:10001', agentCopyIndex);
+const finalAgentProbeIndex = dockerfile.indexOf(finalAgentProbe, userIndex);
+const entrypointIndex = dockerfile.indexOf('ENTRYPOINT [', userIndex);
+assert(agentCopyIndex >= 0,
+  'The root-owned final Java agent must be explicitly readable by the unprivileged app user.');
+assert(userIndex > agentCopyIndex && finalAgentProbeIndex > userIndex && entrypointIndex > finalAgentProbeIndex,
+  'The final image must load the copied agent as UID 10001 with networking disabled before it is published.');
+assert.match(finalImageSmoke, /--network=none[\s\\\n]*--read-only[\s\\\n]*--user 10001:10001[\s\\\n]*--cap-drop=ALL[\s\\\n]*--security-opt=no-new-privileges[\s\\\n]*--pids-limit=128[\s\\\n]*--memory=512m/,
+  'The isolated final-image agent smoke must use the production security and resource profile.');
+assert.match(finalImageSmoke, /tmpfs-size=16777216,tmpfs-mode=1777,U=true,noexec,nosuid,nodev/,
+  'The isolated final-image agent smoke must use the production noexec 16 MiB tmpfs.');
+assert.match(finalImageSmoke, /-javaagent:\/opt\/opentelemetry-javaagent\.jar/);
+assert.match(finalImageSmoke, /image_ref=\$\{1:\?usage:/,
+  'The final-image smoke must accept an already loaded image reference.');
+assert.match(finalImageSmoke, /wait_seconds=\$\{2:-120\}/);
+assert.match(finalImageSmoke, /wait_seconds > 120/,
+  'The final-image startup wait must remain bounded to at most 120 seconds.');
+assert.match(finalImageSmoke, /podman run -d --pull=never --platform linux\/amd64 --name/,
+  'The full startup smoke must run the preloaded image without pulling or overriding its default entrypoint.');
+assert.match(finalImageSmoke, /podman exec "\$container_id" \/opt\/runtime\/bin\/java -cp \/opt\/healthcheck ContainerHealthCheck/,
+  'The full startup smoke must poll the image healthcheck under its runtime profile.');
+assert.match(finalImageSmoke, /elapsed_seconds=.*app_start_seconds/);
+assert.match(finalImageSmoke, /\{\{json \.State\}\}/,
+  'Failed startup diagnostics must capture container exit and OOM state before cleanup.');
 assert.match(dockerfile, /modules="\$\{modules\},jdk\.crypto\.ec,java\.instrument"/,
   'The reduced runtime must retain the agent module even if app dependencies stop referencing it.');
 assert.match(dockerfile, /otelcol-contrib validate --config=\/tmp\/collector\.yaml/,
