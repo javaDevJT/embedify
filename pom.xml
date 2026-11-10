@@ -6,17 +6,21 @@
   <name>Embedify</name><description>Lightweight, customizable calendar feed embeds</description>
   <properties>
     <java.version>25</java.version>
+    <opentelemetry.version>1.66.0</opentelemetry.version>
     <!-- Remove these overrides when Spring Boot manages these security fixes. -->
     <jackson-bom.version>3.1.7</jackson-bom.version>
     <tomcat.version>11.0.26</tomcat.version>
   </properties>
   <dependencies>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc</artifactId></dependency>
+    <dependency><groupId>io.opentelemetry</groupId><artifactId>opentelemetry-api</artifactId><version>${opentelemetry.version}</version></dependency>
     <dependency><groupId>com.github.ben-manes.caffeine</groupId><artifactId>caffeine</artifactId></dependency>
     <dependency><groupId>org.apache.httpcomponents.client5</groupId><artifactId>httpclient5</artifactId></dependency>
     <dependency><groupId>org.mnode.ical4j</groupId><artifactId>ical4j</artifactId><version>4.3.0</version></dependency>
     <dependency><groupId>org.jsoup</groupId><artifactId>jsoup</artifactId><version>1.23.2</version></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc-test</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>io.opentelemetry</groupId><artifactId>opentelemetry-sdk</artifactId><version>${opentelemetry.version}</version><scope>test</scope></dependency>
+    <dependency><groupId>io.opentelemetry</groupId><artifactId>opentelemetry-sdk-testing</artifactId><version>${opentelemetry.version}</version><scope>test</scope></dependency>
   </dependencies>
   <licenses><license><name>Embedify Hosted-Use License 1.0</name><url>https://embedify.javadevjt.tech/license</url></license></licenses>
   <build>
