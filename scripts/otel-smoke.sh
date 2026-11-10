@@ -59,10 +59,12 @@ cleanup() {
 
 assert_ordered() {
   local file=$1 first=$2 second=$3
-  local first_offset second_offset
-  first_offset=$(grep -b -o -F -m 1 -- "$first" "$file" | cut -d: -f1 || true)
-  second_offset=$(grep -b -o -F -m 1 -- "$second" "$file" | cut -d: -f1 || true)
-  if [[ -z "$first_offset" || -z "$second_offset" ]] || (( 10#$first_offset >= 10#$second_offset )); then
+  local first_position second_position
+  first_position=$(awk -v marker="$first" 'index($0, marker) { printf "%d:%d", NR, index($0, marker); exit }' "$file")
+  second_position=$(awk -v marker="$second" 'index($0, marker) { printf "%d:%d", NR, index($0, marker); exit }' "$file")
+  if [[ -z "$first_position" || -z "$second_position" ]] || \
+    ! awk -F: -v first="$first_position" -v second="$second_position" \
+      'BEGIN { split(first, a, ":"); split(second, b, ":"); exit !(a[1] < b[1] || (a[1] == b[1] && a[2] < b[2])) }'; then
     printf 'Expected ordered log markers in %s.\n' "$file" >&2
     return 1
   fi
