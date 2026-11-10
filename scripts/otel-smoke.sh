@@ -68,6 +68,22 @@ assert_ordered() {
   fi
 }
 
+assert_span_trace() {
+  local file=$1 expected_trace_id=$2 expected_name=$3
+  if ! awk -v expected_trace_id="$expected_trace_id" -v expected_name="$expected_name" '
+    /Trace ID/ { trace_id = $NF }
+    /Name[[:space:]]*:/ {
+      span_name = $0
+      sub(/^.*Name[[:space:]]*:[[:space:]]*/, "", span_name)
+      if (trace_id == expected_trace_id && span_name == expected_name) found = 1
+    }
+    END { exit !found }
+  ' "$file"; then
+    printf 'Expected span %s to carry trace ID %s.\n' "$expected_name" "$expected_trace_id" >&2
+    return 1
+  fi
+}
+
 trap cleanup EXIT
 trap 'printf "Isolated telemetry smoke failed at line %s (status %s).\n" "$LINENO" "$?" >&2' ERR
 
@@ -161,6 +177,7 @@ wait_for_capture() {
   local deadline=$((SECONDS + 30))
   local markers=(
     'fixture-untraced-log-healthy'
+    'fixture-correlated-log'
     'fixture-multiline-first'
     'fixture-multiline-second'
     'SeverityText: INFO'
@@ -170,8 +187,19 @@ wait_for_capture() {
     'java.lang.IllegalStateException'
     'Started EmbedifyApplication'
     'service.name: Str(embedify)'
+    'service.namespace: Str(javadevjt)'
+    'deployment.environment.name: Str(production)'
+    'service.version: Str(collector-smoke)'
+    'host.name: Str('
     'http.client.request.duration'
     'http.server.request.duration'
+    'jvm.gc.duration'
+    'jvm.memory.used'
+    'jvm.thread.count'
+    'embedify.calendar.events'
+    'embedify.upstream.fetch'
+    'embedify.operation.calls'
+    'embedify.operation.duration'
     'Exemplar #0'
     'server.address: Str(127.0.0.1)'
     'http.response.status_code'
@@ -191,6 +219,11 @@ wait_for_capture() {
     sleep 0.2
   done
   printf '%s\n' 'Required telemetry did not reach the capture within 30 seconds.' >&2
+  for marker in "${markers[@]}"; do
+    if ! grep -Fq -- "$marker" "$work/capture.log"; then
+      printf 'Missing capture marker: %s\n' "$marker" >&2
+    fi
+  done
   return 1
 }
 
@@ -199,6 +232,7 @@ wait_for_port 14319 || { printf '%s\n' 'Capture receiver did not start.' >&2; ex
 
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:14318
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+export OTEL_PROPAGATORS=tracecontext
 export OTEL_TRACES_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
@@ -207,7 +241,7 @@ export OTEL_BSP_SCHEDULE_DELAY=1000
 export OTEL_BSP_EXPORT_TIMEOUT=2000
 export OTEL_BSP_MAX_QUEUE_SIZE=128
 export OTEL_BSP_MAX_EXPORT_BATCH_SIZE=32
-export OTEL_METRICS_EXPORT_INTERVAL=1000
+export OTEL_METRIC_EXPORT_INTERVAL=1000
 export OTEL_BLRP_SCHEDULE_DELAY=1000
 export OTEL_BLRP_EXPORT_TIMEOUT=2000
 export OTEL_BLRP_MAX_QUEUE_SIZE=128
@@ -239,6 +273,23 @@ assert_ordered "$work/fixture.log" 'fixture-untraced-log-healthy' 'fixture-multi
 assert_ordered "$work/fixture.log" 'fixture-multiline-first' 'fixture-redaction-message'
 assert_ordered "$work/capture.log" 'fixture-untraced-log-healthy' 'fixture-multiline-first'
 assert_ordered "$work/capture.log" 'fixture-multiline-first' 'fixture-redaction-message'
+app_trace_id=$(grep -Eo 'fixture-app-request-trace-id-[0-9a-f]{32}' "$work/fixture.log" | head -n 1 | sed 's/.*-//')
+if [[ ! "$app_trace_id" =~ ^[0-9a-f]{32}$ ]]; then
+  printf '%s\n' 'The instrumented application request did not produce a W3C trace identity.' >&2
+  exit 1
+fi
+grep -F "fixture-app-request-trace-id-$app_trace_id" "$work/capture.log" >/dev/null
+grep -F "$app_trace_id" "$work/capture.log" >/dev/null
+assert_span_trace "$work/capture.log" "$app_trace_id" 'embedify.calendar.events'
+correlated_log=$(grep -Eo 'fixture-correlated-log traceId=[0-9a-f]{32} spanId=[0-9a-f]{16}' "$work/fixture.log" | head -n 1)
+correlation_trace_id=$(printf '%s' "$correlated_log" | sed -E 's/.*traceId=([0-9a-f]{32}).*/\1/')
+correlation_span_id=$(printf '%s' "$correlated_log" | sed -E 's/.*spanId=([0-9a-f]{16}).*/\1/')
+if [[ ! "$correlation_trace_id" =~ ^[0-9a-f]{32}$ || ! "$correlation_span_id" =~ ^[0-9a-f]{16}$ ]]; then
+  printf '%s\n' 'The Logback correlation fixture did not produce trace and span identities.' >&2
+  exit 1
+fi
+grep -Eiq "Trace[[:space:]_]*ID.*$correlation_trace_id" "$work/capture.log"
+grep -Eiq "Span[[:space:]_]*ID.*$correlation_span_id" "$work/capture.log"
 grep -F 'fixture-redaction-message https://calendar.example.test/[redacted]' "$work/capture.log" >/dev/null
 grep -E 'Started .*Application' "$work/capture.log" >/dev/null
 grep -F 'service.name: Str(embedify)' "$work/capture.log" >/dev/null
@@ -249,7 +300,7 @@ grep -F 'server.address: Str(127.0.0.1)' "$work/capture.log" >/dev/null
 grep -F 'http.response.status_code' "$work/capture.log" >/dev/null
 grep -F '503' "$work/capture.log" >/dev/null
 grep -F 'java.lang.IllegalStateException' "$work/capture.log" >/dev/null
-if grep -E 'SMOKE_PATH|SMOKE_QUERY|fixture-user|fixture-pass' "$work/capture.log" >/dev/null; then
+if grep -E 'SMOKE_PATH|SMOKE_QUERY|SMOKE_CALENDAR_FEED|fixture-user|fixture-pass' "$work/capture.log" >/dev/null; then
   printf '%s\n' 'Collector output retained a fixture URL path, query, or userinfo secret.' >&2
   exit 1
 fi
@@ -279,4 +330,4 @@ if [[ "$app_exit" != 0 && "$app_exit" != 143 ]]; then
 fi
 grep -E 'Started .*Application' "$work/app.log" >/dev/null
 
-printf '%s\n' 'OpenTelemetry isolated smoke passed: original console logs, untraced Logback export, multiline and exception detail, redaction, MVC/Apache HTTP spans and metrics, HTTP success/failure, downstream Collector outage, and direct exporter-failure isolation.'
+printf '%s\n' 'OpenTelemetry isolated smoke passed: original console logs, untraced Logback export and correlation, rejected loopback calendar URL with no fetch, W3C trace propagation, application/HTTP/JVM metrics, redaction, HTTP success/failure, downstream Collector outage, direct exporter-failure isolation, and SIGTERM shutdown.'
