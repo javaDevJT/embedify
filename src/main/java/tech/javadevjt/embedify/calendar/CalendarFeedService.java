@@ -14,10 +14,15 @@ import net.fortuna.ical4j.model.component.VEvent;
 import net.fortuna.ical4j.model.property.DateProperty;
 import net.fortuna.ical4j.model.property.RecurrenceId;
 import net.fortuna.ical4j.model.property.Uid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import tech.javadevjt.embedify.net.SafeFetchException;
 import tech.javadevjt.embedify.net.SafeFetcher;
+import tech.javadevjt.embedify.telemetry.EmbedifyTelemetry;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -44,11 +49,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
 public class CalendarFeedService {
+    private static final Logger LOG = LoggerFactory.getLogger(CalendarFeedService.class);
     private static final int MAX_FEEDS = 5;
     private static final int MAX_RANGE_DAYS = 93;
     private static final int MAX_FEED_BYTES = 1024 * 1024;
@@ -67,6 +74,7 @@ public class CalendarFeedService {
     }
 
     private final SafeFetcher fetcher;
+    private final EmbedifyTelemetry telemetry;
     private final Semaphore parsePermits = new Semaphore(2);
     private final Cache<ParsedFeedKey, CachedParsedFeed> parsedFeedCache = Caffeine
             .<ParsedFeedKey, CachedParsedFeed>newBuilder()
@@ -74,11 +82,55 @@ public class CalendarFeedService {
             .weigher((ParsedFeedKey key, CachedParsedFeed cached) -> cached.weight())
             .build();
 
-    public CalendarFeedService(SafeFetcher fetcher) {
+    @Autowired
+    public CalendarFeedService(SafeFetcher fetcher, EmbedifyTelemetry telemetry) {
         this.fetcher = fetcher;
+        this.telemetry = telemetry;
+    }
+
+    public CalendarFeedService(SafeFetcher fetcher) {
+        this(fetcher, new EmbedifyTelemetry());
     }
 
     public EventsResponse events(List<String> feeds, LocalDate from, LocalDate to, String timezone) {
+        try (EmbedifyTelemetry.Operation operation = telemetry.startOperation(
+                "embedify.calendar.events", "calendar.events")) {
+            if (feeds != null) operation.attribute("embedify.feed.count", Math.min(feeds.size(), MAX_FEEDS + 1));
+            try {
+                EventsResponse response = eventsInternal(feeds, from, to, timezone);
+                telemetry.recordRequestedFeeds(feeds.size());
+                telemetry.recordReturnedEvents(response.events().size(), response.truncated());
+                operation.attribute("embedify.event.count", response.events().size());
+                operation.attribute("embedify.response.truncated", response.truncated());
+                operation.succeed();
+                return response;
+            } catch (SafeFetchException exception) {
+                String outcome = switch (exception.kind()) {
+                    case INVALID_INPUT -> "invalid_input";
+                    case BUSY -> "busy";
+                    case UPSTREAM -> "upstream";
+                };
+                if (exception.kind() != SafeFetchException.Kind.INVALID_INPUT) {
+                    LOG.warn("Calendar operation failed: outcome={}", outcome);
+                }
+                operation.fail(outcome);
+                throw exception;
+            } catch (ResponseStatusException exception) {
+                String outcome = responseStatusOutcome(exception);
+                if (!"invalid_input".equals(outcome)) {
+                    LOG.warn("Calendar operation failed: outcome={}", outcome);
+                }
+                operation.fail(outcome);
+                throw exception;
+            } catch (RuntimeException exception) {
+                LOG.error("Calendar operation failed: outcome=failure");
+                operation.fail("failure");
+                throw exception;
+            }
+        }
+    }
+
+    private EventsResponse eventsInternal(List<String> feeds, LocalDate from, LocalDate to, String timezone) {
         if (feeds == null || feeds.isEmpty() || feeds.size() > MAX_FEEDS) {
             throw badRequest("Provide between one and five calendar feeds.");
         }
@@ -139,23 +191,47 @@ public class CalendarFeedService {
         }
 
         ParsedFeedKey key = new ParsedFeedKey(contentDigest(body), from, to, zone, feedIndex, limit);
-        CachedParsedFeed cached = parsedFeedCache.get(key, ignored -> {
-            if (!parsePermits.tryAcquire()) {
-                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
-                        "Calendar processing capacity is busy.");
-            }
-            try {
-                FeedResult result = parseFeed(content, from, to, zone, feedIndex, limit);
-                return new CachedParsedFeed(result, parsedFeedWeight(body.length, result));
-            } finally {
-                parsePermits.release();
-            }
-        });
+        AtomicBoolean cacheMiss = new AtomicBoolean();
+        CachedParsedFeed cached;
+        try {
+            cached = parsedFeedCache.get(key, ignored -> {
+                cacheMiss.set(true);
+                if (!parsePermits.tryAcquire()) {
+                    throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                            "Calendar processing capacity is busy.");
+                }
+                try {
+                    FeedResult result = parseFeed(content, from, to, zone, feedIndex, limit);
+                    return new CachedParsedFeed(result, parsedFeedWeight(body.length, result));
+                } finally {
+                    parsePermits.release();
+                }
+            });
+        } finally {
+            telemetry.recordCacheRequest("parsed_feed", cacheMiss.get() ? "miss" : "hit");
+        }
         return cached.result();
     }
 
     FeedResult parseFeed(String content, LocalDate from, LocalDate to, ZoneId zone,
                          int feedIndex, int limit) {
+        try (EmbedifyTelemetry.Operation operation = telemetry.startOperation(
+                "embedify.calendar.feed.parse", "calendar.feed.parse")) {
+            operation.attribute("embedify.feed.index", feedIndex);
+            try {
+                FeedResult result = parseFeedInternal(content, from, to, zone, feedIndex, limit);
+                operation.attribute("embedify.event.count", result.events().size());
+                operation.succeed();
+                return result;
+            } catch (RuntimeException exception) {
+                operation.fail("upstream");
+                throw exception;
+            }
+        }
+    }
+
+    private FeedResult parseFeedInternal(String content, LocalDate from, LocalDate to, ZoneId zone,
+                                         int feedIndex, int limit) {
         validateSourceShape(content);
         net.fortuna.ical4j.model.Calendar calendar;
         try {
@@ -474,6 +550,14 @@ public class CalendarFeedService {
 
     private static ResponseStatusException upstreamFailure() {
         return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "A calendar feed could not be read.");
+    }
+
+    private static String responseStatusOutcome(ResponseStatusException exception) {
+        int status = exception.getStatusCode().value();
+        if (status == HttpStatus.TOO_MANY_REQUESTS.value()) return "busy";
+        if (status >= 500) return "upstream";
+        if (status >= 400) return "invalid_input";
+        return "failure";
     }
 
     private record ParsedFeedKey(String bodyHash, LocalDate from, LocalDate to, ZoneId zone,

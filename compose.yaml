@@ -12,6 +12,7 @@ services:
       OTEL_RESOURCE_ATTRIBUTES: "service.namespace=javadevjt,service.version=${EMBEDIFY_IMAGE:?Set EMBEDIFY_IMAGE to the published GHCR digest},deployment.environment.name=production"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_PROPAGATORS: tracecontext
       OTEL_TRACES_EXPORTER: otlp
       OTEL_METRICS_EXPORTER: otlp
       OTEL_LOGS_EXPORTER: otlp
@@ -20,7 +21,7 @@ services:
       OTEL_BSP_EXPORT_TIMEOUT: "5000"
       OTEL_BSP_MAX_QUEUE_SIZE: "1024"
       OTEL_BSP_MAX_EXPORT_BATCH_SIZE: "256"
-      OTEL_METRICS_EXPORT_INTERVAL: "60000"
+      OTEL_METRIC_EXPORT_INTERVAL: "60000"
       OTEL_BLRP_SCHEDULE_DELAY: "5000"
       OTEL_BLRP_EXPORT_TIMEOUT: "5000"
       OTEL_BLRP_MAX_QUEUE_SIZE: "1024"

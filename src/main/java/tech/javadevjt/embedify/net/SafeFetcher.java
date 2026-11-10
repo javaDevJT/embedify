@@ -17,6 +17,7 @@ import org.apache.hc.core5.util.Timeout;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import tech.javadevjt.embedify.telemetry.EmbedifyTelemetry;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -38,6 +39,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Bounded, DNS-pinned HTTPS fetcher shared by calendar feeds and style extraction. */
 @Component
@@ -56,17 +58,30 @@ public final class SafeFetcher {
     private final long successTtlNanos;
     private final long failureTtlNanos;
     private final ThreadPoolExecutor dnsPool;
+    private final EmbedifyTelemetry telemetry;
 
     @Autowired
-    public SafeFetcher(@Value("${embedify.upstream.max-concurrent:12}") int maxConcurrentFetches) {
-        this(maxConcurrentFetches, null, null, Duration.ofSeconds(60), Duration.ofSeconds(4));
+    public SafeFetcher(@Value("${embedify.upstream.max-concurrent:12}") int maxConcurrentFetches,
+                       EmbedifyTelemetry telemetry) {
+        this(maxConcurrentFetches, null, null, Duration.ofSeconds(60), Duration.ofSeconds(4), telemetry);
+    }
+
+    public SafeFetcher(int maxConcurrentFetches) {
+        this(maxConcurrentFetches, null, null, Duration.ofSeconds(60), Duration.ofSeconds(4),
+                new EmbedifyTelemetry());
     }
 
     SafeFetcher(int maxConcurrentFetches, PublicHttpsUrlPolicy urlPolicy, RemoteFetch remoteFetch,
                 Duration successTtl, Duration failureTtl) {
+        this(maxConcurrentFetches, urlPolicy, remoteFetch, successTtl, failureTtl, new EmbedifyTelemetry());
+    }
+
+    SafeFetcher(int maxConcurrentFetches, PublicHttpsUrlPolicy urlPolicy, RemoteFetch remoteFetch,
+                Duration successTtl, Duration failureTtl, EmbedifyTelemetry telemetry) {
         if (maxConcurrentFetches < 1 || maxConcurrentFetches > 64) {
             throw new IllegalArgumentException("embedify.upstream.max-concurrent must be between 1 and 64");
         }
+        this.telemetry = Objects.requireNonNull(telemetry);
         this.upstreamSlots = new Semaphore(maxConcurrentFetches, true);
         this.dnsPool = new ThreadPoolExecutor(
                 DNS_THREADS, DNS_THREADS, 0, TimeUnit.MILLISECONDS,
@@ -107,31 +122,67 @@ public final class SafeFetcher {
      * coalesced and cached for 60 seconds; failures are coalesced briefly to dampen retries.
      */
     public FetchResult fetch(String rawUrl, int maxBytes) {
-        return fetch(rawUrl, maxBytes, false, false);
+        return fetch(rawUrl, maxBytes, false, false, "calendar_feed");
     }
 
     /** Fetches a bounded prefix from an allowed text resource for style extraction. */
     public FetchResult fetchStylePrefix(String rawUrl, int maxBytes) {
-        return fetch(rawUrl, maxBytes, false, true);
+        return fetch(rawUrl, maxBytes, false, true, "style_prefix");
     }
 
     /** Fetches a resource and requires every redirect to stay on the initial HTTPS origin. */
     public FetchResult fetchSameOrigin(String rawUrl, int maxBytes) {
-        return fetch(rawUrl, maxBytes, true, false);
+        return fetch(rawUrl, maxBytes, true, false, "same_origin");
     }
 
-    private FetchResult fetch(String rawUrl, int maxBytes, boolean sameOriginOnly, boolean prefixMode) {
-        if (maxBytes < 1 || maxBytes > MAX_ALLOWED_BYTES) {
-            throw new IllegalArgumentException("maxBytes must be between 1 and 1048576");
+    private FetchResult fetch(String rawUrl, int maxBytes, boolean sameOriginOnly, boolean prefixMode,
+                              String mode) {
+        try (EmbedifyTelemetry.Operation operation = telemetry.startOperation(
+                "embedify.upstream.fetch", "upstream.fetch")) {
+            operation.attribute("embedify.fetch.mode", mode);
+            try {
+                if (maxBytes < 1 || maxBytes > MAX_ALLOWED_BYTES) {
+                    throw new IllegalArgumentException("maxBytes must be between 1 and 1048576");
+                }
+                URI normalized = urlPolicy.normalize(rawUrl);
+                CacheKey key = new CacheKey(normalized.toASCIIString(), maxBytes, sameOriginOnly, prefixMode);
+                AtomicBoolean cacheMiss = new AtomicBoolean();
+                CachedFetch value;
+                try {
+                    value = cache.get(key, ignored -> {
+                        cacheMiss.set(true);
+                        try (EmbedifyTelemetry.Operation request = telemetry.startOperation(
+                                "embedify.upstream.request", "upstream.request")) {
+                            request.attribute("embedify.fetch.mode", mode);
+                            CachedFetch fetched = fetchAndCache(normalized, maxBytes, sameOriginOnly, prefixMode);
+                            if (fetched.failure == null) request.succeed();
+                            else request.fail(outcome(fetched.failure));
+                            return fetched;
+                        }
+                    });
+                } finally {
+                    telemetry.recordCacheRequest("upstream", cacheMiss.get() ? "miss" : "hit");
+                }
+                if (value.failure != null) throw value.failure;
+                FetchResult result = value.result;
+                operation.succeed();
+                return new FetchResult(result.body(), result.contentType(), result.url());
+            } catch (SafeFetchException exception) {
+                operation.fail(outcome(exception));
+                throw exception;
+            } catch (RuntimeException exception) {
+                operation.fail("failure");
+                throw exception;
+            }
         }
-        URI normalized = urlPolicy.normalize(rawUrl);
-        CacheKey key = new CacheKey(normalized.toASCIIString(), maxBytes, sameOriginOnly, prefixMode);
-        CachedFetch value = cache.get(key, ignored -> fetchAndCache(normalized, maxBytes, sameOriginOnly, prefixMode));
-        if (value.failure != null) {
-            throw value.failure;
-        }
-        FetchResult result = value.result;
-        return new FetchResult(result.body(), result.contentType(), result.url());
+    }
+
+    private static String outcome(SafeFetchException exception) {
+        return switch (exception.kind()) {
+            case INVALID_INPUT -> "invalid_input";
+            case BUSY -> "busy";
+            case UPSTREAM -> "upstream";
+        };
     }
 
     private CachedFetch fetchAndCache(URI initialUrl, int maxBytes, boolean sameOriginOnly, boolean prefixMode) {

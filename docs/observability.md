@@ -61,6 +61,14 @@ Baseline and post-deployment container-log captures use separate write-once file
 
 ## Qualification evidence
 
+### Release-clone source and local runtime evidence (2026-11-08)
+
+The source patch is based on deployed source commit `630f9a6e39ee17840fcab09c893ec816bbb5e59b`. It selectively ports the read-only donor's URL-free operation spans, bounded outcome/cache/feed metrics, OpenTelemetry API/test dependencies, W3C trace-context configuration, and offline telemetry/package-smoke tests. The target's later business behavior remains in place. `mvn -B test` passed **38 tests, 0 failures, 0 errors, 0 skips**; `mvn -B -DskipTests package` produced `target/embedify-0.1.0.jar` (SHA-256 `8a33d465e1368e4d51edc491dfb42ac51c3e9c30cf49ff2beccf36e78e411793`).
+
+For local ARM64 runtime coverage, that exact-source JAR was mounted read-only at `/app/embedify.jar` in the existing corrected runtime image and its healthcheck metadata derivative. The image runs as UID/GID 10001 and its inherited healthcheck command remained `/opt/runtime/bin/java -cp /opt/healthcheck ContainerHealthCheck` (30-second interval, 4-second timeout, 45-second start period, 3 retries); manual execution exited 0. Temurin 25.0.4.1 loaded the Java agent as UID 10001 and reported agent version 2.32.0. A synthetic W3C-parented request to the loopback-only `/api/events` endpoint returned 400 for `http://127.0.0.1`; the fake OTLP receiver saw the requested trace ID and accepted 3 trace, 13 metric, and 3 log batches. `podman stop` delivered SIGTERM and Spring/Tomcat logged graceful shutdown completion (the Java process exited 143, the signal status).
+
+The runtime check reused local ARM64 image IDs `ee04564f07748c4f30b95f49f45a786b96de4f550413b4eb061b6c96f59857f3` and healthcheck derivative `11d9971155195a272ae8fe37afad2f5bcd6463f17cc6da0852036b13abc5336b`; these images do not carry a source-revision label. The read-only JAR mount ties the observed app runtime to the tested source package, but does not qualify a self-contained image built from this worktree. Failed attempts remain separate: `embedify-healthcheck-smoke-20261108` on the earlier metadata image logged `Error opening zip file or JAR manifest missing: /opt/opentelemetry-javaagent.jar`; the first fake receiver in `embedify-target-source-qualification-20261108` raised `TypeError: a bytes-like object is required, not 'str'` and caused exporter errors. The corrected receiver was used for the successful pass. No provider or production collector was contacted, and no credential was mounted. This is local ARM64 evidence only; CI, a self-contained exact-source image, NAS AMD64, deployment, and persisted OpenWoof readback remain pending.
+
 The checks are intentionally separate:
 
 1. Maven tests and the source policy check validate application behavior and the intended telemetry, network, and privacy settings.
