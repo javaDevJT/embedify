@@ -24,8 +24,16 @@ assert.doesNotMatch(`${compose}\n${envExample}\n${truenas}\n${keyPrompt}`,
   /\b192\.168\.\d{1,3}\.\d{1,3}\b|\/mnt\//,
   'Public deployment sources must not expose machine-specific hosts or host mount paths.');
 
-assert.match(dockerfile, /^FROM otel\/opentelemetry-collector-contrib:0\.163\.2@sha256:[a-f0-9]{64} AS collector$/m,
+assert.match(dockerfile, /^FROM otel\/opentelemetry-collector-contrib:0\.165\.0@sha256:e40d61f10c9a617cca1ffd1be4d7e2b3a4b0f0001798ff07e58cabe82e618cea AS collector$/m,
   'Collector build input must be version and digest pinned.');
+assert.match(dockerfile, /^FROM eclipse-temurin:25-jdk-alpine-3\.24@sha256:c7c3d0bdf7f2bbc5a05a6712ed334d198360105634ea9adf76fca94f381b1e3f AS jdk$/m,
+  'The linked JRE must be built with a digest-pinned musl JDK.');
+assert.match(dockerfile, /^FROM bash:5\.3\.20-alpine3\.24@sha256:589adbc588d8ef3c1ec3c68333faf4baf5dccb65d3cb50f6cf3d78cad2d6e1b0 AS runtime$/m,
+  'The isolated fixture builder must use a digest-pinned Alpine shell image.');
+assert.match(dockerfile, /^FROM alpine:3\.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf$/m,
+  'The minimal musl runtime base must be digest pinned.');
+assert.match(dockerfile, /apk add --no-cache ca-certificates-bundle=20261020-r0 libgcc=15\.2\.0-r5 libstdc\+\+=15\.2\.0-r5 zlib=1\.4-r0/,
+  'The runtime must pin the fixed certificate bundle, JRE native runtime dependencies, and fixed zlib package with APK metadata.');
 assert.match(dockerfile, /ADD --checksum=sha256:[a-f0-9]{64}[\s\\\n]*https:\/\/github\.com\/open-telemetry\/opentelemetry-java-instrumentation\/releases\/download\/v2\.32\.0\/opentelemetry-javaagent\.jar/m,
   'Java agent must be downloaded from the official release with a pinned checksum.');
 assert.match(dockerfile, /ENTRYPOINT \["\/opt\/runtime\/bin\/java", "-javaagent:\/opt\/opentelemetry-javaagent\.jar"/,
