@@ -33,18 +33,13 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        if: steps.scope.outputs.setup == 'true'
+        if: steps.scope.outputs.setup == 'true' || steps.scope.outputs.deps == 'true'
         with:
           node-version: '26.13.1'
           package-manager-cache: false
       - name: Validate the Renovate configuration
         if: steps.scope.outputs.setup == 'true'
         run: npx --yes --package renovate@45.1.2 -- renovate-config-validator --strict
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        if: steps.scope.outputs.deps == 'true'
-        with:
-          node-version: '26'
-          package-manager-cache: false
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         if: steps.scope.outputs.deps == 'true'
         with:
