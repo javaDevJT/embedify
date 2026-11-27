@@ -24,6 +24,16 @@
   "vulnerabilityAlerts": {
     "enabled": false
   },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^pom\\.xml$/"],
+      "matchStrings": ["<tomcat\\.version>(?<currentValue>[^<\\s]+)</tomcat\\.version>"],
+      "depNameTemplate": "org.apache.tomcat.embed:tomcat-embed-core",
+      "datasourceTemplate": "maven",
+      "versioningTemplate": "maven"
+    }
+  ],
   "packageRules": [
     {
       "description": "Application images are advanced by the existing verified release workflow",
@@ -49,6 +59,23 @@
       ],
       "automerge": true,
       "matchCurrentVersion": "!/^0[.]/"
+    },
+    {
+      "description": "Use the 11.0-series fix for CVE-2026-133325",
+      "matchManagers": ["custom.regex"],
+      "matchDatasources": ["maven"],
+      "matchPackageNames": ["org.apache.tomcat.embed:tomcat-embed-core"],
+      "allowedVersions": "[11.0.30,11.1)"
+    },
+    {
+      "description": "Apply the existing tested Maven update policy to the embedded Tomcat override",
+      "matchManagers": ["custom.regex"],
+      "matchDatasources": ["maven"],
+      "matchPackageNames": ["org.apache.tomcat.embed:tomcat-embed-core"],
+      "matchFileNames": ["pom.xml"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": "!/^0[.]/",
+      "automerge": true
     }
   ],
   "platformCommit": "enabled"
