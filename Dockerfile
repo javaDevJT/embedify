@@ -114,6 +114,7 @@ ENV JAVA_HOME=/opt/runtime
 WORKDIR /app
 
 RUN apk add --no-cache ca-certificates-bundle=20261020-r0 libgcc=15.2.0-r5 libstdc++=15.2.0-r5 zlib=1.4-r0 \
+    && apk upgrade --no-cache libcrypto3 libssl3 \
     && test -s /etc/ssl/certs/ca-certificates.crt
 
 COPY --from=runtime /tmp/embedify.passwd /etc/passwd
