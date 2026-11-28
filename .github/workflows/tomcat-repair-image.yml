@@ -1,0 +1,100 @@
+name: Tomcat Repair Image
+
+on:
+  pull_request_target:
+    branches: [main]
+    paths: [pom.xml]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: embedify-tomcat-repair-image-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  DOCKER_BUILD_RECORD_RETENTION_DAYS: "1"
+  DOCKER_BUILD_RECORD_UPLOAD: "false"
+  CI_CACHE_DISABLE: "1"
+
+jobs:
+  # Quarterback must require a completed, successful scan on the exact repair
+  # head. GitHub-wide required checks treat conditionally skipped jobs as passing.
+  scan:
+    name: Build and scan Tomcat repair candidate
+    if: >-
+      github.repository == 'javaDevJT/embedify' &&
+      github.event.pull_request.head.repo.id == github.event.repository.id &&
+      startsWith(github.head_ref, 'quarterback/tomcat-repair/') &&
+      ((github.actor == 'javaDevJT' &&
+        github.event.pull_request.user.login == 'javaDevJT' &&
+        github.event.pull_request.user.id == 123842956) ||
+       (github.actor == 'quarterback-ci[bot]' &&
+        github.event.pull_request.user.login == 'quarterback-ci[bot]' &&
+        github.event.pull_request.user.id == 341165314))
+    runs-on: truenas-embedify-storage-10g
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the trusted base and scanner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check out the exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: repair-candidate
+          persist-credentials: false
+      - name: Verify the trusted base and single Maven version edit
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test "$GITHUB_SHA" = "$PR_BASE_SHA"
+          python3 .github/scripts/verify-tomcat-repair-source.py \
+            --base . --candidate repair-candidate \
+            --base-sha "$PR_BASE_SHA" --head-sha "$PR_HEAD_SHA"
+      - name: Set up authenticated remote BuildKit
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          cache-binary: false
+          driver: remote
+          endpoint: tcp://buildkit:1234
+          driver-opts: |
+            cacert=/run/buildkit/tls/ca.pem
+            cert=/run/buildkit/tls/client.pem
+            key=/run/buildkit/tls/client.key
+      - name: Prepare the job-local OCI output directory
+        run: install -d -m 0700 "$RUNNER_TEMP/container-security"
+      - name: Build local OCI candidate with SBOM and provenance
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ./repair-candidate
+          file: ./repair-candidate/Dockerfile
+          platforms: linux/amd64
+          no-cache: true
+          push: false
+          outputs: type=oci,dest=${{ runner.temp }}/container-security/pr.oci.tar
+          build-args: QB_SOURCE_COMMIT=${{ github.event.pull_request.head.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/javaDevJT/embedify
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha }}
+          provenance: mode=max
+          sbom: true
+      - name: Generate SBOM and enforce High/Critical vulnerability gate
+        uses: ./.github/actions/container-security
+        with:
+          image: oci-archive:${{ runner.temp }}/container-security/pr.oci.tar
+          platforms: linux/amd64
+          report-directory: ${{ runner.temp }}/container-security/pr-reports
+          artifact-name: container-security-pr-${{ github.run_id }}-${{ github.run_attempt }}
+          source-revision: ${{ github.event.pull_request.head.sha }}
+          report-image: ${{ runner.temp }}/container-security/pr.oci.tar
+      - name: Remove local candidate and security reports
+        if: always()
+        run: |
+          rm -rf -- "$RUNNER_TEMP/container-security/pr-reports"
+          rm -f -- "$RUNNER_TEMP/container-security/pr.oci.tar" "$RUNNER_TEMP/security-high-critical.json"
