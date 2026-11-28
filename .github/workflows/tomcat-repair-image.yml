@@ -48,13 +48,26 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           path: repair-candidate
           persist-credentials: false
+      - name: Set up Python for Maven source verification
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
       - name: Verify the trusted base and single Maven version edit
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          set -euo pipefail
           test "$GITHUB_SHA" = "$PR_BASE_SHA"
-          python3 .github/scripts/verify-tomcat-repair-source.py \
+          umask 077
+          parser_venv="$(mktemp -d "$RUNNER_TEMP/tomcat-source-parser.XXXXXXXX")"
+          trap 'rm -rf -- "$parser_venv"' EXIT
+          python3 -m venv "$parser_venv"
+          printf '%s\n' 'defusedxml==0.7.1 --hash=sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61' > "$parser_venv/requirements.txt"
+          "$parser_venv/bin/python" -m pip --isolated install --disable-pip-version-check \
+            --index-url https://pypi.org/simple --no-cache-dir --no-deps --only-binary=:all: \
+            --require-hashes -r "$parser_venv/requirements.txt"
+          "$parser_venv/bin/python" -I .github/scripts/verify-tomcat-repair-source.py \
             --base . --candidate repair-candidate \
             --base-sha "$PR_BASE_SHA" --head-sha "$PR_HEAD_SHA"
       - name: Set up authenticated remote BuildKit

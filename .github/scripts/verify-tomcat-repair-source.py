@@ -5,7 +5,9 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from xml.etree import ElementTree
+
+from defusedxml import ElementTree
+from defusedxml.common import DefusedXmlException
 
 
 MAVEN_NAMESPACE = {"m": "http://maven.apache.org/POM/4.0.0"}
@@ -34,9 +36,14 @@ def tree_entries(repository, revision):
 
 
 def tomcat_property(pom):
-    if not 0 < len(pom) <= MAX_POM_BYTES or re.search(rb"<!DOCTYPE|<!ENTITY", pom, re.IGNORECASE):
-        raise ValueError("The POM is outside the supported XML input.")
-    root = ElementTree.fromstring(pom.decode("utf-8"))
+    if not 0 < len(pom) <= MAX_POM_BYTES:
+        raise ValueError("The POM is outside the supported byte limit.")
+    try:
+        root = ElementTree.fromstring(
+            pom.decode("utf-8"), forbid_dtd=True, forbid_entities=True, forbid_external=True,
+        )
+    except DefusedXmlException as error:
+        raise ValueError("The POM is outside the supported XML input.") from error
     parent = root.find("m:parent", MAVEN_NAMESPACE)
     if (parent is None
             or parent.findtext("m:groupId", namespaces=MAVEN_NAMESPACE) != "org.springframework.boot"
